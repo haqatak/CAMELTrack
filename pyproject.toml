@@ -25,3 +25,6 @@ torchmetrics = ">=1.4.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.plugins.tracklab_plugin]
+cameltrack = "cameltrack.utils.config_finder:ConfigFinder"
