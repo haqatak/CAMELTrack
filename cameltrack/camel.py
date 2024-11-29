@@ -9,10 +9,9 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 from pytorch_metric_learning import distances, losses, miners, reducers
 
-from cameltrack.train import assignment_strats
 from cameltrack.utils.merge_token_strats import merge_token_strats
 from cameltrack.utils.similarity_metrics import similarity_metrics
-from cameltrack.utils import coordinates
+from cameltrack.utils import coordinates, assignment_strats
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ class Detections(Tracklets):
         super().__init__(features, feats_masks, targets)
 
 
-class SimFormer(pl.LightningModule):
+class CAMEL(pl.LightningModule):
     def __init__(
             self,
             transformer_cfg: DictConfig,
@@ -99,7 +98,7 @@ class SimFormer(pl.LightningModule):
         self.final_tracking_threshold = sim_threshold
         self.use_computed_threshold = use_computed_threshold
         log.info(
-            f"SimFormer initialized with final_tracking_threshold={sim_threshold} from yaml config. Will be overwritten later by an optimized threshold if SimFormer validation is enabled.")
+            f"CAMEL initialized with final_tracking_threshold={sim_threshold} from yaml config. Will be overwritten later by an optimized threshold if CAMEL validation is enabled.")
         self.tl_margin = tl_margin
         self.loss_strat = loss_strat
         self.contrastive_loss_strat = contrastive_loss_strat

@@ -13,7 +13,7 @@ from matplotlib import patches, pyplot as plt
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from pathlib import Path
 
-from dd_sort import SimFormer
+from cameltrack.camel import CAMEL
 from tracklab.utils import coordinates
 from tracklab.utils.cv2 import cv2_load_image, draw_text
 
@@ -61,7 +61,7 @@ class VisualizeTrackletBatches(pl.Callback):
         self.display_batch(batch, outputs, association_result, step, batch_idx)
 
     @staticmethod
-    def compute_association(pl_module: SimFormer, outputs):
+    def compute_association(pl_module: CAMEL, outputs):
         tracks = outputs["tracks"]
         dets = outputs["dets"]
         threshold = pl_module.sim_threshold if pl_module.sim_threshold else pl_module.computed_sim_threshold
