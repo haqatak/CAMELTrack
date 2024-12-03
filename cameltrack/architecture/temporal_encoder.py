@@ -3,7 +3,6 @@ import torch.nn as nn
 import math
 
 from cameltrack.architecture.base_module import Module
-from ..camel import Detections  # TODO: find better place
 
 from hydra.utils import instantiate
 
