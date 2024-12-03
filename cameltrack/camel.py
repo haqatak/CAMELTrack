@@ -20,19 +20,13 @@ log = logging.getLogger(__name__)
 class Tracklets:
     def __init__(self, features, feats_masks, targets=None):
         """
-        :param feats: dict of tensors float32 [B, N, T, F]
+        :param features: dict of tensors float32 [B, N, T, F]
         :param feats_masks: tensor bool [B, N, T]
-        :param masks: tensor bool [B, N]
-        :param tokens: tensor float32 [B, N, E]
-        :param embs: tensor float32 [B, N, E]
         :param targets: tensor float32 [B, N]
         """
         self.feats = features
         self.feats_masks = feats_masks
         self.masks = self.feats_masks.any(dim=-1)
-        self.tokens = None
-        self.embs = None
-        self.special_tokens = False
         if targets is not None and len(targets.shape) > 2:
             self.targets = targets[:, :, 0]
         else:
@@ -43,11 +37,8 @@ class Tracklets:
 class Detections(Tracklets):
     def __init__(self, features, feats_masks, targets=None):
         """
-        :param feats: dict of tensors float32 [B, N, 1, F]
+        :param features: dict of tensors float32 [B, N, 1, F]
         :param feats_masks: tensor bool [B, N, 1]
-        :param masks: tensor bool [B, N]
-        :param tokens: tensor float32 [B, N, E]
-        :param embs: tensor float32 [B, N, E]
         :param targets: tensor float32 [B, N]
         """
         assert feats_masks.shape[2] == 1

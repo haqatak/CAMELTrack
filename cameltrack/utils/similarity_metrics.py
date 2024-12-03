@@ -1,6 +1,3 @@
-# random_assignement
-# euclidean_sim_matrix
-# iou_sim_matrix
 import torch
 import torch.nn.functional as F
 
