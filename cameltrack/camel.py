@@ -61,16 +61,21 @@ class CAMEL(pl.LightningModule):
             temp_enc_cfg: DictConfig,
             train_cfg: DictConfig = None,
             batch_transforms: DictConfig = None,
-            sim_threshold: int = 0.7,  # todo place in CAMELTrack
-            use_computed_threshold: bool = True,  # todo place in CAMELTrack
+            merge_token_strat: str = "sum",
+            sim_strat: str = "cosine",
+            sim_threshold: int = 0.5,
+            use_computed_threshold: bool = True,
     ):
         super().__init__()
         self.save_hyperparameters()
         self.gaffe = instantiate(gaffe_cfg)  # TODO : remove dependency to Hydra
-        self.temporal_encoders = nn.ModuleDict(
-            {n: instantiate(t, name=n) for n, t in temp_enc_cfg.items() if t['_enabled_']}
-        )
+        self.tokenizers = nn.ModuleDict({n: instantiate(t, name=n) for n, t in temp_enc_cfg.items() if t['_enabled_']})
         self.train_cfg = train_cfg
+        self.merge_token_strat = merge_token_strat
+        if sim_strat == "default_for_each_token_type":
+            log.warning("sim_strat set to 'default_for_each_token_type', setting merge_token_strat to 'identity'.")
+            self.merge_token_strat = "identity"
+        self.sim_strat = sim_strat
         self.computed_sim_threshold = None
         self.computed_sim_threshold2 = None
         self.best_distr_overlap_threshold = None
@@ -80,8 +85,6 @@ class CAMEL(pl.LightningModule):
         log.info(f"CAMEL initialized with final_tracking_threshold={sim_threshold} from yaml config. "
                  f"Will be overwritten later by an optimized threshold if CAMEL validation is enabled.")
 
-        self.norm_coords = coordinates.norm_coords_strats["positive"]
-
         # handle instantiation functions
         if batch_transforms is not None:
             self.batch_transforms = {n: instantiate(t) for n, t in
@@ -90,10 +93,16 @@ class CAMEL(pl.LightningModule):
             self.batch_transforms = {}
 
         # merging
-        self.merge = merge_token_strats["sum"]
+        if self.merge_token_strat in merge_token_strats:
+            self.merge = merge_token_strats[self.merge_token_strat]
+        else:
+            raise NotImplementedError
 
         # similarity
-        self.similarity_metric = similarity_metrics["norm_euclidean"]
+        if sim_strat in similarity_metrics:
+            self.similarity_metric = similarity_metrics[sim_strat]
+        else:
+            raise NotImplementedError
 
         # association
         self.association = assignment_strats.hungarian_algorithm
@@ -107,9 +116,8 @@ class CAMEL(pl.LightningModule):
         tracks, dets = self.train_val_preprocess(batch)
         self.sanity_checks(tracks, dets)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
-        sim_loss, cls_loss = self.compute_loss(tracks, dets, td_sim_matrix)
-
-        loss = self.log_loss(cls_loss, sim_loss, "train")
+        loss = self.compute_loss(tracks, dets, td_sim_matrix)
+        self.log_loss(loss, "train")
         return {
             "loss": loss,
             "dets": dets,
@@ -121,9 +129,8 @@ class CAMEL(pl.LightningModule):
         tracks, dets = self.train_val_preprocess(batch)
         self.sanity_checks(tracks, dets)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
-        sim_loss, cls_loss = self.compute_loss(tracks, dets, td_sim_matrix)
-
-        loss = self.log_loss(cls_loss, sim_loss, "val")
+        loss = self.compute_loss(tracks, dets, td_sim_matrix)
+        self.log_loss(loss, "val")
         return {
             "loss": loss,
             "tracks": tracks,
@@ -134,7 +141,6 @@ class CAMEL(pl.LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         tracks, dets = self.predict_preprocess(batch)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
-        # best_cls_roc_threshold = self.best_roc_cls_threshold if self.best_roc_cls_threshold else self.det_threshold  # fixme
         association_matrix, association_result = self.association(td_sim_matrix,
                                                                   tracks.masks,
                                                                   dets.masks,
@@ -162,10 +168,8 @@ class CAMEL(pl.LightningModule):
         """
         if self.norm_coords is not None:
             batch = self.norm_coords(batch)
-        tracks = Tracklets(batch["track_feats"], ~batch["track_targets"].isnan(),
-                           batch["track_targets"])
-        dets = Detections(batch["det_feats"], ~batch["det_targets"].isnan(),
-                          batch["det_targets"])
+        tracks = Tracklets(batch["track_feats"], ~batch["track_targets"].isnan(), batch["track_targets"])
+        dets = Detections(batch["det_feats"], ~batch["det_targets"].isnan(), batch["det_targets"])
         return tracks, dets
 
     def predict_preprocess(self, batch):
@@ -209,14 +213,14 @@ class CAMEL(pl.LightningModule):
 
     def tokenize(self, tracks, dets):
         """
-        Operate the tokenization step for the differents temporal_encoders
+        Operate the tokenization step for the differents tokenizers
         :param dets: Detections
         :param tracks: Tracklets
         :return: updated dets and tracks with partial tokens in a dict not merged
         """
         tracks.tokens = {}
         dets.tokens = {}
-        for n, t in self.temporal_encoders.items():
+        for n, t in self.tokenizers.items():
             tracks.tokens[n] = t(tracks)
             dets.tokens[n] = t(dets)
         return tracks, dets
@@ -230,7 +234,13 @@ class CAMEL(pl.LightningModule):
         if isinstance(tracks.embs, dict):
             td_sim_matrix = []
             for (tokenizer_name, t), (_, d) in zip(tracks.embs.items(), dets.embs.items()):
-                td_sim_matrix.append(self.similarity_metric(t, tracks.masks, d, dets.masks))
+                # each token type has its own default distance (reid = cosine, bbox = iou, etc).
+                # Use that default distance for a heuristic that would, for instance, combine IoU with cosine distance.
+                if self.sim_strat == "default_for_each_token_type":
+                    sm = similarity_metrics[self.tokenizers[tokenizer_name].default_similarity_metric]
+                    td_sim_matrix.append(sm(t, tracks.masks, d, dets.masks))
+                else:
+                    td_sim_matrix.append(self.similarity_metric(t, tracks.masks, d, dets.masks))
             td_sim_matrix = torch.stack(td_sim_matrix).mean(dim=0)
         else:
             td_sim_matrix = self.similarity_metric(tracks.embs, tracks.masks, dets.embs, dets.masks)
@@ -271,10 +281,8 @@ class CAMEL(pl.LightningModule):
                 masked_det_embs = dets_embs[i, dets.masks[i]]
                 masked_det_targets = dets.targets[i, dets.masks[i]]
 
-                if (not tracks.special_tokens and (
-                        len(masked_det_embs) != 0 or len(masked_track_embs) != 0)) \
-                        or (tracks.special_tokens and (len(masked_det_embs) > 1 or len(
-                    masked_track_embs) > 1)):  # TODO make sure works with special tokens
+                if (not tracks.special_tokens and (len(masked_det_embs) != 0 or len(masked_track_embs) != 0)) \
+                    or (tracks.special_tokens and (len(masked_det_embs) > 1 or len(masked_track_embs) > 1)):
                     mask_sim_loss[h, i] = True
 
                     # Compute embeddings loss on all tracks/detections (track_ids >= 0)
@@ -288,16 +296,13 @@ class CAMEL(pl.LightningModule):
 
         # Compute mean losses over valid items in the batch
         sim_loss = sim_loss[mask_sim_loss].mean()
-
         # Handle NaN values
         sim_loss = sim_loss.nan_to_num(0)
 
         return sim_loss
 
-    def log_loss(self, sim_loss, step):
-        loss_dict = {}
-        loss = self.alpha_loss * sim_loss
-        loss_dict[f"{step}/loss"] = loss
+    def log_loss(self, loss, step):
+        loss_dict = {f"{step}/loss": loss}
         self.log_dict(
             loss_dict,
             on_epoch=True,
@@ -305,7 +310,6 @@ class CAMEL(pl.LightningModule):
             prog_bar="train" == step,
             logger=True,
         )
-        return loss
 
     def configure_optimizers(self):
         if hasattr(self.train_cfg, "finetune_tokenizers") and self.train_cfg.finetune_tokenizers:
@@ -313,12 +317,12 @@ class CAMEL(pl.LightningModule):
             param_groups = [
                 {
                     'params': [p for n, p in self.named_parameters() if
-                               not n.startswith('temporal_encoders')],
+                               not n.startswith('tokenizers')],
                     'lr': self.train_cfg.init_lr
                 },
                 {
                     'params': [p for n, p in self.named_parameters() if
-                               n.startswith('temporal_encoders')],
+                               n.startswith('tokenizers')],
                     'lr': self.train_cfg.init_lr / 10
                     # Slower learning rate for tokenizer
                 }
@@ -333,11 +337,12 @@ class CAMEL(pl.LightningModule):
                 lr=self.train_cfg.init_lr,
                 weight_decay=self.train_cfg.weight_decay,
             )
+        estimated_steps = self.trainer.estimated_stepping_batches
         scheduler = transformers.get_cosine_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=self.trainer.estimated_stepping_batches / 20,
+            num_warmup_steps=estimated_steps / 20,
             # FIXME very slow, call a lot of get_items
-            num_training_steps=self.trainer.estimated_stepping_batches,
+            num_training_steps=estimated_steps,
         )
         return {
             "optimizer": optimizer,
@@ -348,7 +353,7 @@ class CAMEL(pl.LightningModule):
         }
 
     def configure_callbacks(self):
-        from cameltrack.train.callbacks import SimMetrics, ClsMetrics # Only used for training
+        from cameltrack.train.callbacks import SimMetrics # Only used for training
         callbacks = [SimMetrics()]
         return callbacks
 
@@ -362,17 +367,17 @@ class CAMEL(pl.LightningModule):
         # Load custom attributes from the checkpoint dictionary
         self.computed_sim_threshold = checkpoint.get('computed_sim_threshold', None)
         self.computed_sim_threshold2 = checkpoint.get('computed_sim_threshold2', None)
-        self.best_distr_overlap_threshold = checkpoint.get(
-            'best_distr_overlap_threshold', None)
+        self.best_distr_overlap_threshold = checkpoint.get('best_distr_overlap_threshold', None)
         self.on_validation_end()
 
     def on_validation_end(self):
         if self.final_tracking_threshold is None or self.use_computed_threshold:
-            assert self.computed_sim_threshold is not None, "computed_sim_threshold or final_tracking_threshold must be set"
+            assert self.computed_sim_threshold is not None, \
+                "computed_sim_threshold or final_tracking_threshold must be set"
             self.final_tracking_threshold = self.computed_sim_threshold
-            log.info(
-                f"final_tracking_threshold set to {self.final_tracking_threshold} (use_computed_threshold={self.use_computed_threshold})")
+            log.info(f"final_tracking_threshold set to {self.final_tracking_threshold} "
+                     f"(use_computed_threshold={self.use_computed_threshold})")
         else:
-            log.info(
-                f"final_tracking_threshold already set to {self.final_tracking_threshold}. Skipping automatically computed value.")
+            log.info(f"final_tracking_threshold already set to {self.final_tracking_threshold}. "
+                     f"Skipping automatically computed value.")
         return
