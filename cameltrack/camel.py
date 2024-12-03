@@ -63,8 +63,8 @@ class CAMEL(pl.LightningModule):
             batch_transforms: DictConfig = None,
             merge_token_strat: str = "sum",
             sim_strat: str = "cosine",
-            sim_threshold: int = 0.5,
-            use_computed_threshold: bool = True,
+            sim_threshold: int = 0.5,  # this should be in CAMELTrack
+            use_computed_threshold: bool = True,  # this should be in CAMELTrack
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -84,6 +84,7 @@ class CAMEL(pl.LightningModule):
         self.use_computed_threshold = use_computed_threshold
         log.info(f"CAMEL initialized with final_tracking_threshold={sim_threshold} from yaml config. "
                  f"Will be overwritten later by an optimized threshold if CAMEL validation is enabled.")
+        self.norm_coords = coordinates.norm_coords_strats["positive"]
 
         # handle instantiation functions
         if batch_transforms is not None:
