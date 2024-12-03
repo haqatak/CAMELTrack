@@ -7,7 +7,7 @@ import torch.nn as nn
 import transformers
 from hydra.utils import instantiate
 from omegaconf import DictConfig
-from pytorch_metric_learning import distances, losses, miners, reducers
+from pytorch_metric_learning import distances, losses, reducers
 
 from cameltrack.utils.merge_token_strats import merge_token_strats
 from cameltrack.utils.similarity_metrics import similarity_metrics
@@ -54,11 +54,14 @@ class CAMEL(pl.LightningModule):
             batch_transforms: DictConfig = None,
             merge_token_strat: str = "sum",
             sim_strat: str = "cosine",
-            sim_threshold: int = 0.5,  # this should be in CAMELTrack
-            use_computed_threshold: bool = True,  # this should be in CAMELTrack
+            sim_threshold: int = 0.5,  # fixme this should be in CAMELTrack
+            use_computed_threshold: bool = True,  # fixme this should be in CAMELTrack
     ):
         super().__init__()
-        self.save_hyperparameters()
+        all_params = locals()  # Get all arguments passed to __init__
+        ignore_keys = [key for key in all_params if "checkpoint_path" in key]
+        self.save_hyperparameters(ignore=ignore_keys)
+
         self.gaffe = instantiate(gaffe_cfg)  # TODO : remove dependency to Hydra
         self.tokenizers = nn.ModuleDict({n: instantiate(t, name=n) for n, t in temp_enc_cfg.items() if t['_enabled_']})
         self.train_cfg = train_cfg
