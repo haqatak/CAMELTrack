@@ -3,6 +3,13 @@
 Welcome to the CAMELTrack codebase. CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), 
 a research framework for multi-object tracking.
 
+<p align="center">
+  <img src="media/dancetrack.gif" width="300" />
+  <img src="media/sportsmot.gif" width="300" />
+  <img src="media/mot17.gif" width="300" /> 
+
+</p>
+
 ## Quick Installation Guide
 
 ### Clone the repositories
