@@ -1,0 +1,89 @@
+# CAMELTrack
+
+Welcome to the CAMELTrack codebase. CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), 
+a research framework for multi-object tracking.
+
+## Quick Installation Guide
+
+### Clone the repositories
+First git clone this repository, and the [TrackLab framework](https://github.com/TrackingLaboratory/tracklab) *in adjacent directories* : 
+```bash
+mkdir mot
+cd mot
+git clone XXX
+git clone https://github.com/TrackingLaboratory/tracklab.git
+```
+
+> [!NOTE]
+> If you are using an IDE (like PyCharm or VS Code), we suggest creating a single project with `soccernet` as root directory.
+> Instructions : [PyCharm](https://www.jetbrains.com/help/pycharm/configuring-project-structure.html) and [VS Code](https://code.visualstudio.com/docs/editor/multi-root-workspaces)
+
+#### Install using Poetry
+1. Install poetry : https://python-poetry.org/docs/#installing-with-the-official-installer
+2. Install the dependencies : 
+```bash
+cd cameltrack
+poetry install
+poetry run mim install mmcv==2.0.1
+poetry shell
+```
+
+To enter the virtual environment created by Poetry, you can either use `poetry shell`,
+or prefix all commands by `poetry run`.
+
+### Updating
+Please make sure to check the official GitHub regularly for updates.
+To update this repository to its latest version, run `git pull` on both repositories:
+```bash
+git pull
+git -C ../tracklab pull
+```
+
+After updating, you should rerun the installation of the dependencies in case they are updated 
+(either running `poetry install` or *both* `pip install`'s).
+
+## Data preparation
+
+Download [MOT17](https://motchallenge.net/), [MOT20](https://motchallenge.net/), 
+[DanceTrack](https://drive.google.com/drive/folders/1ASZCFpPEfSOJRktR8qQ_ZoT9nZR0hOea), 
+[BEE24](https://holmescao.github.io/datasets/BEE24), [PoseTrack21](https://github.com/anDoer/PoseTrack21) and put them under cameltrack/data.
+
+## Off-the-shelf Model weights
+The model weights for the detectors, reID models, and pose estimation models are available here : XXX. The input cues
+from each model (if you don't want to run the off-the-shelf models) are available here : XXX.
+
+Alternatively, you can use the detections from [DiffMOT](https://github.com/Kroery/DiffMOT) directly, by placing them in the appropriate directories.
+
+## CAMELTrack model weights
+The weights that have been used for the paper can be found here: XXX.
+
+## Training
+
+### Training on a default dataset
+Run the following command to train on a specific dataset (for example, DanceTrack) : 
+```
+tracklab -cn cameltrack_train dataset=dancetrack modules.track=camel_dancetrack
+```
+> [!NOTE]
+> You can always modify the configuration in [cameltrack.yaml](cameltrack/configs/cameltrack.yaml), and in the
+> other files inside this directory, instead of passing these values in the command line.
+
+By default this will create a new directory inside `outputs/cameltrack_train`, which will contain the checkpoints
+to the created models, which can then be used for tracking and evaluation.
+
+### Training on a custom dataset
+To train on a custom dataset, you'll have to integrate it in tracklab, either by using the MOT format, or by implementing
+a new dataset class. Once that's done, you can modify [cameltrack.yaml](cameltrack/configs/cameltrack.yaml), to point to
+the new dataset.
+
+## Tracking
+
+Run the following command to track, for example, on DanceTrack, with the checkpoint obtained from training, or the provided
+model weights :
+
+```
+tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test modules.track=camel_dancetrack modules.track.checkpoint_path=/absolute/path/to/cameltrack_checkpoint.ckpt
+```
+
+By default this will create a new directory inside `outputs/cameltrack` which will contain a visualization of the
+output for each sequence, in addition to the tracking output in MOT format.

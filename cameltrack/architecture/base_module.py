@@ -1,4 +1,6 @@
 import logging
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 from collections import OrderedDict
@@ -13,6 +15,9 @@ class Module(nn.Module):
 
     def init_weights(self, checkpoint_path: str = None, module_name: str = None):
         if checkpoint_path and module_name:
+            if not Path(checkpoint_path).exists():
+                log.warning(f"Checkpoint path {checkpoint_path} not found. Will use random weights.")
+                return
             state_dict = torch.load(checkpoint_path)["state_dict"]
             state_dict = OrderedDict(
                 (k, state_dict[k]) for k in state_dict if k.startswith(module_name)

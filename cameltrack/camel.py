@@ -18,15 +18,22 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class Tracklets:
+    """Contains all information of tracklets.
+
+    Args:
+        features: dict of tensors float32 [B, N, T, F]
+        feats_masks: tensor bool [B, N, T] of valid features for padding
+        targets: optional, tensor float32 [B, N]
+
+    Attributes:
+        feats: dict of tensors float32 [B, N, T, F]
+        feats_masks: tensor bool [B, N, T]
+        masks: tensor bool [B, N]
+        tokens: tensor float32 [B, N, E]
+        embs: tensor float32 [B, N, E]
+        targets: tensor float32 [B, N]
+    """
     def __init__(self, features, feats_masks, targets=None):
-        """
-        :param feats: dict of tensors float32 [B, N, T, F]
-        :param feats_masks: tensor bool [B, N, T]
-        :param masks: tensor bool [B, N]
-        :param tokens: tensor float32 [B, N, E]
-        :param embs: tensor float32 [B, N, E]
-        :param targets: tensor float32 [B, N]
-        """
         self.feats = features
         self.feats_masks = feats_masks
         self.masks = self.feats_masks.any(dim=-1)
@@ -41,20 +48,45 @@ class Tracklets:
 
 @dataclass
 class Detections(Tracklets):
+    """Contains all information of detections.
+
+    Args:
+        features: dict of tensors float32 [B, N, 1, F]
+        feats_masks: tensor bool [B, N, 1] of valid features for padding
+        targets: optional, tensor float32 [B, N]
+
+    Attributes:
+        feats: dict of tensors float32 [B, N, 1, F]
+        feats_masks: tensor bool [B, N, 1]
+        masks: tensor bool [B, N]
+        tokens: tensor float32 [B, N, E]
+        embs: tensor float32 [B, N, E]
+        targets: tensor float32 [B, N]
+    """
     def __init__(self, features, feats_masks, targets=None):
-        """
-        :param feats: dict of tensors float32 [B, N, 1, F]
-        :param feats_masks: tensor bool [B, N, 1]
-        :param masks: tensor bool [B, N]
-        :param tokens: tensor float32 [B, N, E]
-        :param embs: tensor float32 [B, N, E]
-        :param targets: tensor float32 [B, N]
-        """
         assert feats_masks.shape[2] == 1
         super().__init__(features, feats_masks, targets)
 
 
 class CAMEL(pl.LightningModule):
+    """ CAMEL Transformer : .
+
+    Args:
+      transformer_cfg: dict containing the transformer backbone architecture
+      tokenizers_cfg: dict containing the tokenizers for each cue (key: cue name)
+      classifier_cfg: DEPRECATED
+      train_cfg: dict containing training configuration
+      batch_transforms: dict with "train"/"val"/"test" keys with an instantiatable dict.
+      merge_token_strat: sum/identity/concat
+      sim_strat: default_for_each_token_type/cosine/euclidean/norm_euclidean/iou/random
+      assos_strat: hungarian/argmax/greedy
+      sim_threshold: Threshold for similarity measure
+      use_computed_threshold: if True, use threshold computed during validation
+      tl_margin: ???
+      loss_strat: triplet/infoNCE
+      contrastive_loss_strat: inter/inter_intra/valid_inter/valid_inter_intra
+      norm_coords: centered/positive/None
+    """
     def __init__(
             self,
             transformer_cfg: DictConfig,

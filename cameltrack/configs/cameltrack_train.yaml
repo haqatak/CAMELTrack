@@ -35,7 +35,7 @@ pipeline:
   - track
 
 # Experiment name
-experiment_name: "cameltrack"
+experiment_name: "cameltrack_train"
 
 # Path definitions
 data_dir: "${project_dir}/data"
@@ -52,16 +52,10 @@ test_tracking: True
 print_config: False
 eval_tracking: True
 
-# Dataset configuration
-
-
 # Tracking configuration
-checkpoint_path: "???" # set this on the command line.
-
 modules:
   track:
-    training_enabled: False
-    checkpoint_path: ${checkpoint_path}
+    training_enabled: True
 
 wandb:
   notes: "" # add some notes about the experiment here to be displayed on wandb table
