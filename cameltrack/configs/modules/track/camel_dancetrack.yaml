@@ -1,7 +1,7 @@
 _target_: cameltrack.utils.CAMELTrackLauncher
 _recursive_: false
 training_enabled: true
-checkpoint_path: null # /auto/globalscratch/users/b/s/bstandae/dancetrack/2024-10-30/19-52-02/3/SimFormer/last.ckpt
+checkpoint_path: null
 override_cfg: null
 train_cfg:
   use_wandb: ${use_wandb}
