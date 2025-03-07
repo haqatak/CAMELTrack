@@ -3,7 +3,6 @@ import torch.nn as nn
 import math
 
 from cameltrack.architecture.base_module import Module
-from ..camel import Detections # TODO: find better place
 
 from hydra.utils import instantiate
 
@@ -17,10 +16,20 @@ class TemporalEncoder(Module):
     """
     default_similarity_metric = "norm_euclidean"
 
-    def __init__(self, det_tokenizer, hidden_dim, output_dim, n_heads: int = 4, n_layers: int = 4, dim_feedforward=2048,
-                 num_registers: int = 0, dropout=0.1, checkpoint_path: str = None, occlusion_threshold: float = None,
-                 pass_detections: bool = True, output_strat: str = 'cls', use_pe: bool = True, use_drop: bool = True,
-                 use_norm: bool = True, freeze: bool = False, name: str = None, **kwargs):
+    def __init__(
+        self,
+        det_tokenizer,
+        hidden_dim,
+        output_dim: int = 1024,
+        n_heads: int = 8,
+        n_layers: int = 4,
+        dim_feedforward: int = 2048,
+        dropout: float = 0.1,
+        checkpoint_path: str = None,
+        freeze: bool = False,
+        name: str = None,
+        *args, **kwargs,
+    ):
         super().__init__()
         # transformer parameter related
         self.hidden_dim = hidden_dim
@@ -28,26 +37,20 @@ class TemporalEncoder(Module):
         self.n_heads = n_heads
         self.n_layers = n_layers
         self.dim_feedforward = dim_feedforward
-        self.num_registers = num_registers
         self.dropout = dropout
-        # config transformer related
-        self.use_pe = use_pe
-        self.occlusion_threshold = occlusion_threshold
-        self.use_norm = use_norm
-        self.use_drop = use_drop
-        self.pass_detections = pass_detections
-        self.output_strat = output_strat
+
         # parameters and layers
         self.det_tokenizer = instantiate(det_tokenizer, hidden_dim=hidden_dim, _recursive_=False)
         self.pos_encoder = PositionalEncoding(hidden_dim)
         self.occluded_token = nn.Parameter(torch.zeros(hidden_dim))
-        self.registers_tokens = nn.Parameter(torch.zeros(num_registers + 1, 1, hidden_dim))
+        self.cls = nn.Parameter(torch.zeros(1, 1, hidden_dim))
         self.src_drop = nn.Dropout(dropout)
         self.src_norm = nn.LayerNorm(hidden_dim)
         encoder_layers = nn.TransformerEncoderLayer(hidden_dim, n_heads, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(encoder_layers, n_layers)
         self.linear_out = nn.Linear(hidden_dim, output_dim, bias=True)
 
+        # init weights and freeze
         if name is not None:
             self.init_weights(checkpoint_path=checkpoint_path, module_name=f"tokenizers.{name}")
         else:
@@ -69,33 +72,21 @@ class TemporalEncoder(Module):
         )
 
         tokens = self.det_tokenizer(x)  # [B, N, S, E]
-        if not self.pass_detections and isinstance(x, Detections):
-            tokens = tokens.squeeze(2)  # [B, N, E]
-            output[x.masks] = self.linear_out(tokens[x.masks])
-            return output  # [B, N, O]
-        if self.use_pe:
-            tokens = self.pos_encoder(tokens, x.feats["age"], x.feats_masks)
-        if self.occlusion_threshold is not None:
-            tokens[(x.feats["iou_occlusion"] > self.occlusion_threshold).squeeze(3)] += self.occluded_token
-        if self.use_norm:
-            tokens = self.src_norm(tokens)
-        if self.use_drop:
-            tokens = self.src_drop(tokens)
+        tokens = self.pos_encoder(tokens, x.feats["age"], x.feats_masks)
+        tokens = self.src_norm(tokens)
+        tokens = self.src_drop(tokens)
 
-        src = tokens.permute(2, 0, 1, 3).reshape(S, B * N, E)    # [S, B*N, E]
+        src = tokens.permute(2, 0, 1, 3).reshape(S, B * N, E)  # [S, B*N, E]
 
-        registers = self.registers_tokens.expand(-1, B * N, -1)
-        src = torch.cat([src, registers], dim=0)
+        cls = self.cls.expand(-1, B * N, -1)
+        src = torch.cat([src, cls], dim=0)
 
-        reg_mask = torch.ones((B * N, self.num_registers + 1), dtype=torch.bool, device=x.feats_masks.device)
-        src_mask = torch.cat([x.feats_masks.reshape(B * N, S), reg_mask], dim=1)
+        cls_mask = torch.ones((B * N, 1), dtype=torch.bool, device=x.feats_masks.device)
+        src_mask = torch.cat([x.feats_masks.reshape(B * N, S), cls_mask], dim=1)
 
         src = self.encoder(src, src_key_padding_mask=~src_mask)  # [S, B*N, E]
-        src = src.permute(1, 0, 2).reshape(B, N, S + self.num_registers + 1, E)  # [B, N, S, E]
-        if self.output_strat == "cls":
-            tokens = src[:, :, -1, :]  # [B, N, E]
-        else:
-            tokens = masked_mean(src[:, :, :-(self.num_registers + 1), :], x.feats_masks, dim=2)  # [B, N, E]
+        src = src.permute(1, 0, 2).reshape(B, N, S + 1, E)  # [B, N, S, E]
+        tokens = src[:, :, -1, :]  # [B, N, E]
         output[x.masks] = self.linear_out(tokens[x.masks])
         return output  # [B, N, O]
 
@@ -118,145 +109,9 @@ class PositionalEncoding(nn.Module):
         age = age.view(B * N, S).to(torch.long)
         mask = mask.view(B * N, S)
         age[mask] = age[mask].clamp(min=0, max=self.max_len - 1)
-
         x[mask] = x[mask] + self.pe[age[mask]]
-
         return x.view(B, N, S, E)
 
-
-def masked_mean(tensor, mask, dim):
-    masked_tensor = torch.where(mask.unsqueeze(-1), tensor, torch.zeros_like(tensor))
-
-    sum_result = torch.sum(masked_tensor, dim=dim)
-    count = torch.sum(mask, dim=dim).unsqueeze(-1)
-    count = torch.clamp(count, min=1)
-
-    return sum_result / count
-
-
-class SepLinProjSum(Module):
-    def __init__(self, app_feat_dim: int, st_feat_dim: int, token_dim: int, use_st: bool = True, use_app: bool = True,
-                 **kwargs):
-        super().__init__()
-        self.app_feat_dim = app_feat_dim
-        self.st_feat_dim = st_feat_dim
-        self.token_dim = token_dim
-        self.app_linear = nn.Linear(app_feat_dim, token_dim)
-        self.st_linear = nn.Linear(st_feat_dim, token_dim)
-        self.use_st = use_st
-        self.use_app = use_app
-        assert use_st or use_app, "At least one feature type should be enabled"
-
-    def forward(self, x):
-        tokens = torch.zeros(
-            (*x.feats_masks.shape, self.token_dim),
-            device=x.feats_masks.device,
-            dtype=torch.float32,
-        )
-        if self.use_app:
-            app_cat_feats = torch.cat(
-                [x.feats["embeddings"],
-                 x.feats["visibility_scores"]],
-                dim=-1
-            )
-            tokens[x.feats_masks] += self.app_linear(app_cat_feats[x.feats_masks])
-        if self.use_st:
-            st_cat_feats = torch.cat(
-                [x.feats["bbox_ltwh"],
-                 x.feats["keypoints_xyc"].reshape(*x.feats_masks.shape, -1)],
-                dim=-1
-            )
-            tokens[x.feats_masks] += self.st_linear(st_cat_feats[x.feats_masks])
-        return tokens
-
-
-class CatLinProj(Module):
-    """
-    Project features of detections from feat_dim to token_dim using a linear projection.
-    """
-
-    def __init__(self, app_feat_dim: int, st_feat_dim: int, token_dim: int, use_st: bool = True, use_app: bool = True,
-                 **kwargs):
-        super().__init__()
-        self.app_feat_dim = app_feat_dim
-        self.st_feat_dim = st_feat_dim
-        self.token_dim = token_dim
-        self.use_st = use_st
-        self.use_app = use_app
-        assert use_st or use_app, "At least one feature type should be enabled"
-        feat_dim = (app_feat_dim if use_app else 0) + (st_feat_dim if use_st else 0)
-        self.linear = nn.Linear(feat_dim, token_dim)
-
-    def forward(self, x):
-        cat_feats = []
-        if self.use_app:
-            cat_feats.append(torch.cat(
-                [x.feats["embeddings"],
-                 x.feats["visibility_scores"]],
-                dim=-1
-            ))
-        if self.use_st:
-            cat_feats.append(torch.cat(
-                [x.feats["bbox_ltwh"],
-                 x.feats["keypoints_xyc"].reshape(*x.feats_masks.shape, -1)],
-                dim=-1
-            ))
-        cat_feats = torch.cat(cat_feats, dim=-1)
-        tokens = torch.zeros(
-            (*x.feats_masks.shape, self.token_dim),
-            device=cat_feats.device,
-            dtype=torch.float32,
-        )
-        tokens[x.feats_masks] = self.linear(cat_feats[x.feats_masks])
-        return tokens
-
-
-class CatMLP(Module):
-    """
-    Project features of detections from feat_dim to token_dim using an MLP.
-    """
-
-    def __init__(self, app_feat_dim: int, st_feat_dim: int, token_dim: int, dropout: float = 0.1, use_st: bool = True,
-                 use_app: bool = True, **kwargs):
-        super().__init__()
-        self.app_feat_dim = app_feat_dim
-        self.st_feat_dim = st_feat_dim
-        self.token_dim = token_dim
-        self.dropout = dropout
-        self.use_st = use_st
-        self.use_app = use_app
-        assert use_st or use_app, "At least one feature type should be enabled"
-        feat_dim = (app_feat_dim if use_app else 0) + (st_feat_dim if use_st else 0)
-
-        self.mlp = nn.Sequential(
-            nn.Linear(feat_dim, feat_dim),
-            nn.ReLU(),
-            nn.Dropout(p=dropout),
-            nn.Linear(feat_dim, token_dim)
-        )
-
-    def forward(self, x):
-        cat_feats = []
-        if self.use_app:
-            cat_feats.append(torch.cat(
-                [x.feats["embeddings"],
-                 x.feats["visibility_scores"]],
-                dim=-1
-            ))
-        if self.use_st:
-            cat_feats.append(torch.cat(
-                [x.feats["bbox_ltwh"],
-                 x.feats["keypoints_xyc"].reshape(*x.feats_masks.shape, -1)],
-                dim=-1
-            ))
-        cat_feats = torch.cat(cat_feats, dim=-1)
-        tokens = torch.zeros(
-            (*cat_feats.shape[:-1], self.token_dim),
-            device=cat_feats.device,
-            dtype=torch.float32,
-        )
-        tokens[x.feats_masks] = self.mlp(cat_feats[x.feats_masks])
-        return tokens
 
 class BBoxLinProj(Module):
     def __init__(self, hidden_dim, use_conf, dropout: float = 0.1):

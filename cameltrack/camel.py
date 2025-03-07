@@ -7,7 +7,7 @@ import torch.nn as nn
 import transformers
 from hydra.utils import instantiate
 from omegaconf import DictConfig
-from pytorch_metric_learning import distances, losses, miners, reducers
+from pytorch_metric_learning import distances, losses, reducers
 
 from cameltrack.utils.merge_token_strats import merge_token_strats
 from cameltrack.utils.similarity_metrics import similarity_metrics
@@ -37,9 +37,6 @@ class Tracklets:
         self.feats = features
         self.feats_masks = feats_masks
         self.masks = self.feats_masks.any(dim=-1)
-        self.tokens = None
-        self.embs = None
-        self.special_tokens = False
         if targets is not None and len(targets.shape) > 2:
             self.targets = targets[:, :, 0]
         else:
@@ -89,55 +86,37 @@ class CAMEL(pl.LightningModule):
     """
     def __init__(
             self,
-            transformer_cfg: DictConfig,
-            tokenizers_cfg: DictConfig,
-            classifier_cfg: DictConfig = None,
+            gaffe_cfg: DictConfig,
+            temp_enc_cfg: DictConfig,
             train_cfg: DictConfig = None,
             batch_transforms: DictConfig = None,
             merge_token_strat: str = "sum",
             sim_strat: str = "cosine",
-            assos_strat: str = "hungarian",
-            sim_threshold: int = 0.7,
-            use_computed_threshold: bool = True,
-            tl_margin: float = 0.3,
-            loss_strat: str = "triplet",
-            contrastive_loss_strat: str = "inter_intra",
-            norm_coords: str = None,  # "centered", "positive" or None
+            sim_threshold: int = 0.5,  # fixme this should be in CAMELTrack
+            use_computed_threshold: bool = True,  # fixme this should be in CAMELTrack
     ):
         super().__init__()
-        self.save_hyperparameters()
-        self.transformer = instantiate(transformer_cfg)  # TODO : remove dependency to Hydra
-        self.tokenizers = nn.ModuleDict(
-            {n: instantiate(t, name=n) for n, t in tokenizers_cfg.items() if
-             t['_enabled_']})
+        all_params = locals()  # Get all arguments passed to __init__
+        ignore_keys = [key for key in all_params if "checkpoint_path" in key]
+        self.save_hyperparameters(ignore=ignore_keys)
+
+        self.gaffe = instantiate(gaffe_cfg)  # TODO : remove dependency to Hydra
+        self.tokenizers = nn.ModuleDict({n: instantiate(t, name=n) for n, t in temp_enc_cfg.items() if t['_enabled_']})
         self.train_cfg = train_cfg
         self.merge_token_strat = merge_token_strat
-        if hasattr(self.transformer,
-                   "enable_id_tokens") and self.transformer.enable_id_tokens:
-            log.warning(
-                "EncoderWithIdTokens enabled, setting merge_token_strat to 'identity'.")
-            self.merge_token_strat = "identity"
         if sim_strat == "default_for_each_token_type":
-            log.warning(
-                "sim_strat set to 'default_for_each_token_type', setting merge_token_strat to 'identity'.")
+            log.warning("sim_strat set to 'default_for_each_token_type', setting merge_token_strat to 'identity'.")
             self.merge_token_strat = "identity"
         self.sim_strat = sim_strat
-        self.assos_strat = assos_strat
         self.computed_sim_threshold = None
         self.computed_sim_threshold2 = None
         self.best_distr_overlap_threshold = None
         self.sim_threshold = sim_threshold
         self.final_tracking_threshold = sim_threshold
         self.use_computed_threshold = use_computed_threshold
-        log.info(
-            f"CAMEL initialized with final_tracking_threshold={sim_threshold} from yaml config. Will be overwritten later by an optimized threshold if CAMEL validation is enabled.")
-        self.tl_margin = tl_margin
-        self.loss_strat = loss_strat
-        self.contrastive_loss_strat = contrastive_loss_strat
-        if norm_coords is not None:
-            self.norm_coords = coordinates.norm_coords_strats[norm_coords]
-        else:
-            self.norm_coords = None
+        log.info(f"CAMEL initialized with final_tracking_threshold={sim_threshold} from yaml config. "
+                 f"Will be overwritten later by an optimized threshold if CAMEL validation is enabled.")
+        self.norm_coords = coordinates.norm_coords_strats["positive"]
 
         # handle instantiation functions
         if batch_transforms is not None:
@@ -159,52 +138,19 @@ class CAMEL(pl.LightningModule):
             raise NotImplementedError
 
         # association
-        if self.assos_strat == "hungarian":
-            self.association = assignment_strats.hungarian_algorithm
-        elif self.assos_strat == "argmax":
-            self.association = assignment_strats.argmax_algorithm
-        elif self.assos_strat == "greedy":
-            self.association = assignment_strats.greedy_algorithm
-        else:
-            raise NotImplementedError
-
-        if hasattr(self.transformer,
-                   "state_tokens_enabled") and self.transformer.state_tokens_enabled:
-            log.warning(
-                "EncoderWithStateTokens is not compatible with hungarian association. Switching to greedy association.")
-            self.association = assignment_strats.greedy_algorithm
+        self.association = assignment_strats.hungarian_algorithm
 
         # loss on sim
         distance = distances.CosineSimilarity()
         reducer = reducers.AvgNonZeroReducer()
-        if self.loss_strat == "triplet":
-            self.emb_mining = miners.TripletMarginMiner(
-                margin=self.tl_margin, distance=distance, type_of_triplets="all"
-            )
-            self.sim_loss = losses.TripletMarginLoss(margin=self.tl_margin,
-                                                     distance=distance, reducer=reducer)
-        elif self.loss_strat == "infoNCE":
-            self.sim_loss = losses.NTXentLoss(distance=distance, reducer=reducer)
-        else:
-            raise NotImplementedError
-
-        # classifier
-        if classifier_cfg is not None and classifier_cfg._enabled_:
-            self.classifier = instantiate(classifier_cfg)
-            self.alpha_loss = train_cfg.alpha_loss
-
-            self.sigmoid = nn.functional.sigmoid
-            self.bce = nn.functional.binary_cross_entropy_with_logits
-        else:
-            self.alpha_loss = 1.0
+        self.sim_loss = losses.NTXentLoss(distance=distance, reducer=reducer)
 
     def training_step(self, batch, batch_idx):
         tracks, dets = self.train_val_preprocess(batch)
         self.sanity_checks(tracks, dets)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
-        sim_loss, cls_loss = self.compute_loss(tracks, dets, td_sim_matrix)
-
-        loss = self.log_loss(cls_loss, sim_loss, "train")
+        loss = self.compute_loss(tracks, dets, td_sim_matrix)
+        self.log_loss(loss, "train")
         return {
             "loss": loss,
             "dets": dets,
@@ -216,9 +162,8 @@ class CAMEL(pl.LightningModule):
         tracks, dets = self.train_val_preprocess(batch)
         self.sanity_checks(tracks, dets)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
-        sim_loss, cls_loss = self.compute_loss(tracks, dets, td_sim_matrix)
-
-        loss = self.log_loss(cls_loss, sim_loss, "val")
+        loss = self.compute_loss(tracks, dets, td_sim_matrix)
+        self.log_loss(loss, "val")
         return {
             "loss": loss,
             "tracks": tracks,
@@ -229,7 +174,6 @@ class CAMEL(pl.LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         tracks, dets = self.predict_preprocess(batch)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
-        # best_cls_roc_threshold = self.best_roc_cls_threshold if self.best_roc_cls_threshold else self.det_threshold  # fixme
         association_matrix, association_result = self.association(td_sim_matrix,
                                                                   tracks.masks,
                                                                   dets.masks,
@@ -242,9 +186,7 @@ class CAMEL(pl.LightningModule):
     def forward(self, tracks, dets):
         tracks, dets = self.tokenize(tracks, dets)  # feats -> list(tokens)
         tracks, dets = self.merge(tracks, dets)  # list(tokens) -> tokens
-        tracks, dets = self.transformer(tracks, dets)  # tokens -> embs
-        if hasattr(self, "classifier"):
-            dets = self.classifier(dets)
+        tracks, dets = self.gaffe(tracks, dets)  # tokens -> embs
         td_sim_matrix = self.similarity(tracks, dets)  # embs -> sim_matrix
         return tracks, dets, td_sim_matrix
 
@@ -259,10 +201,8 @@ class CAMEL(pl.LightningModule):
         """
         if self.norm_coords is not None:
             batch = self.norm_coords(batch)
-        tracks = Tracklets(batch["track_feats"], ~batch["track_targets"].isnan(),
-                           batch["track_targets"])
-        dets = Detections(batch["det_feats"], ~batch["det_targets"].isnan(),
-                          batch["det_targets"])
+        tracks = Tracklets(batch["track_feats"], ~batch["track_targets"].isnan(), batch["track_targets"])
+        dets = Detections(batch["det_feats"], ~batch["det_targets"].isnan(), batch["det_targets"])
         return tracks, dets
 
     def predict_preprocess(self, batch):
@@ -326,19 +266,17 @@ class CAMEL(pl.LightningModule):
         # FIXME similarity_metric should be a list, a different metric could be used for each type of token
         if isinstance(tracks.embs, dict):
             td_sim_matrix = []
-            for (tokenizer_name, t), (_, d) in zip(tracks.embs.items(),
-                                                   dets.embs.items()):
-                if self.sim_strat == "default_for_each_token_type":  # each token type has its own default distance (reid = cosine, bbox = iou, etc). Use that default distance for a heuristic that would, for instance, combine IoU with cosine distance.
-                    sm = similarity_metrics[
-                        self.tokenizers[tokenizer_name].default_similarity_metric]
+            for (tokenizer_name, t), (_, d) in zip(tracks.embs.items(), dets.embs.items()):
+                # each token type has its own default distance (reid = cosine, bbox = iou, etc).
+                # Use that default distance for a heuristic that would, for instance, combine IoU with cosine distance.
+                if self.sim_strat == "default_for_each_token_type":
+                    sm = similarity_metrics[self.tokenizers[tokenizer_name].default_similarity_metric]
                     td_sim_matrix.append(sm(t, tracks.masks, d, dets.masks))
                 else:
-                    td_sim_matrix.append(
-                        self.similarity_metric(t, tracks.masks, d, dets.masks))
+                    td_sim_matrix.append(self.similarity_metric(t, tracks.masks, d, dets.masks))
             td_sim_matrix = torch.stack(td_sim_matrix).mean(dim=0)
         else:
-            td_sim_matrix = self.similarity_metric(tracks.embs, tracks.masks, dets.embs,
-                                                   dets.masks)
+            td_sim_matrix = self.similarity_metric(tracks.embs, tracks.masks, dets.embs, dets.masks)
         return td_sim_matrix
 
     def compute_loss(self, tracks, dets, *args):
@@ -364,9 +302,7 @@ class CAMEL(pl.LightningModule):
 
         # Initialize loss variables
         sim_loss = torch.zeros((n_tokens, B), dtype=torch.float32, device=self.device)
-        cls_loss = torch.zeros((n_tokens, B), dtype=torch.float32, device=self.device)
         mask_sim_loss = torch.zeros((n_tokens, B), dtype=torch.bool, device=self.device)
-        mask_cls_loss = torch.zeros((n_tokens, B), dtype=torch.bool, device=self.device)
 
         for h, token_name in enumerate(tracks.embs.keys()):
             tracks_embs = tracks.embs[token_name]
@@ -378,107 +314,28 @@ class CAMEL(pl.LightningModule):
                 masked_det_embs = dets_embs[i, dets.masks[i]]
                 masked_det_targets = dets.targets[i, dets.masks[i]]
 
-                if (not tracks.special_tokens and (
-                        len(masked_det_embs) != 0 or len(masked_track_embs) != 0)) \
-                        or (tracks.special_tokens and (len(masked_det_embs) > 1 or len(
-                    masked_track_embs) > 1)):  # TODO make sure works with special tokens
+                if (not tracks.special_tokens and (len(masked_det_embs) != 0 or len(masked_track_embs) != 0)) \
+                    or (tracks.special_tokens and (len(masked_det_embs) > 1 or len(masked_track_embs) > 1)):
                     mask_sim_loss[h, i] = True
 
-                    if self.loss_strat == "triplet":
-                        if self.contrastive_loss_strat == "inter_intra":
-                            # Compute embeddings loss on all tracks/detections (track_ids != 0)
-                            embeddings = torch.cat([masked_track_embs, masked_det_embs],
-                                                   dim=0)
-                            labels = torch.cat(
-                                [masked_track_targets, masked_det_targets], dim=0)
-                            indices_tuple = self.emb_mining(embeddings, labels)
-                            sim_loss[h, i] = self.sim_loss(embeddings, labels,
-                                                           indices_tuple)
-                        elif self.contrastive_loss_strat == "inter":
-                            # Compute embeddings loss on all tracks/detections (track_ids != 0)
-                            indices_tuple = self.emb_mining(masked_det_embs,
-                                                            masked_det_targets,
-                                                            masked_track_embs,
-                                                            masked_track_targets)
-                            sim_loss[h, i] = self.sim_loss(masked_det_embs,
-                                                           masked_det_targets,
-                                                           indices_tuple,
-                                                           masked_track_embs,
-                                                           masked_track_targets)
-                        elif self.contrastive_loss_strat == "valid_inter_intra":
-                            # Compute embeddings loss on all valid tracks/detections (track_ids >= 0)
-                            valid_tracks = masked_track_targets >= 0
-                            valid_dets = masked_det_targets >= 0
-                            embeddings = torch.cat([masked_track_embs[valid_tracks],
-                                                    masked_det_embs[valid_dets]],
-                                                   dim=0)
-                            labels = torch.cat([masked_track_targets[valid_tracks],
-                                                masked_det_targets[valid_dets]],
-                                               dim=0)
-                            indices_tuple = self.emb_mining(embeddings, labels)
-                            sim_loss[h, i] = self.sim_loss(embeddings, labels,
-                                                           indices_tuple)
-                        elif self.contrastive_loss_strat == "valid_inter":
-                            # Compute embeddings loss on all valid tracks/detections (track_ids >= 0)
-                            valid_tracks = masked_track_targets >= 0
-                            valid_dets = masked_det_targets >= 0
-                            indices_tuple = self.emb_mining(masked_det_embs[valid_dets],
-                                                            masked_det_targets[
-                                                                valid_dets],
-                                                            masked_track_embs[
-                                                                valid_tracks],
-                                                            masked_track_targets[
-                                                                valid_tracks])
-                            sim_loss[h, i] = self.sim_loss(masked_det_embs[valid_dets],
-                                                           masked_det_targets[
-                                                               valid_dets],
-                                                           indices_tuple,
-                                                           masked_track_embs[
-                                                               valid_tracks],
-                                                           masked_track_targets[
-                                                               valid_tracks])
-                        else:
-                            raise NotImplementedError
-                    elif self.loss_strat == "infoNCE":
-                        # Compute embeddings loss on all tracks/detections (track_ids >= 0)
-                        valid_tracks = masked_track_targets >= 0
-                        valid_dets = masked_det_targets >= 0
-                        embeddings = torch.cat([masked_track_embs[valid_tracks],
-                                                masked_det_embs[valid_dets]], dim=0)
-                        labels = torch.cat([masked_track_targets[valid_tracks],
-                                            masked_det_targets[valid_dets]], dim=0)
-                        sim_loss[h, i] = self.sim_loss(embeddings, labels)
-                    else:
-                        raise NotImplementedError
-
-                if hasattr(self, "classifier") and len(masked_det_embs) != 0:
-                    mask_cls_loss[h, i] = True
-
-                    # Compute cls loss on all detections
-                    inputs = dets.confs[i, dets.masks[i]]
-                    targets = (masked_det_targets >= 0).to(torch.float32)
-                    weights = torch.ones(len(targets), device=self.device)
-                    weights[targets == 0] /= 2 * (targets == 0).sum()
-                    weights[targets == 1] /= 2 * (targets == 1).sum()
-                    cls_loss[h, i] = self.bce(inputs, targets, weight=weights)
+                    # Compute embeddings loss on all tracks/detections (track_ids >= 0)
+                    valid_tracks = masked_track_targets >= 0
+                    valid_dets = masked_det_targets >= 0
+                    embeddings = torch.cat([masked_track_embs[valid_tracks],
+                                            masked_det_embs[valid_dets]], dim=0)
+                    labels = torch.cat([masked_track_targets[valid_tracks],
+                                        masked_det_targets[valid_dets]], dim=0)
+                    sim_loss[h, i] = self.sim_loss(embeddings, labels)
 
         # Compute mean losses over valid items in the batch
         sim_loss = sim_loss[mask_sim_loss].mean()
-        cls_loss = cls_loss[mask_cls_loss].mean()
-
         # Handle NaN values
         sim_loss = sim_loss.nan_to_num(0)
-        cls_loss = cls_loss.nan_to_num(0)
 
-        return sim_loss, cls_loss
+        return sim_loss
 
-    def log_loss(self, cls_loss, sim_loss, step):
-        loss_dict = {}
-        if hasattr(self, "classifier"):
-            loss_dict[f"{step}/sim_loss"] = sim_loss
-            loss_dict[f"{step}/cls_loss"] = cls_loss
-        loss = self.alpha_loss * sim_loss + (1 - self.alpha_loss) * cls_loss
-        loss_dict[f"{step}/loss"] = loss
+    def log_loss(self, loss, step):
+        loss_dict = {f"{step}/loss": loss}
         self.log_dict(
             loss_dict,
             on_epoch=True,
@@ -486,11 +343,9 @@ class CAMEL(pl.LightningModule):
             prog_bar="train" == step,
             logger=True,
         )
-        return loss
 
     def configure_optimizers(self):
-        if hasattr(self.train_cfg,
-                   "finetune_tokenizers") and self.train_cfg.finetune_tokenizers:
+        if hasattr(self.train_cfg, "finetune_tokenizers") and self.train_cfg.finetune_tokenizers:
             # Split parameters into tokenizer and non-tokenizer groups
             param_groups = [
                 {
@@ -515,11 +370,12 @@ class CAMEL(pl.LightningModule):
                 lr=self.train_cfg.init_lr,
                 weight_decay=self.train_cfg.weight_decay,
             )
+        estimated_steps = self.trainer.estimated_stepping_batches
         scheduler = transformers.get_cosine_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=self.trainer.estimated_stepping_batches / 20,
+            num_warmup_steps=estimated_steps / 20,
             # FIXME very slow, call a lot of get_items
-            num_training_steps=self.trainer.estimated_stepping_batches,
+            num_training_steps=estimated_steps,
         )
         return {
             "optimizer": optimizer,
@@ -530,10 +386,8 @@ class CAMEL(pl.LightningModule):
         }
 
     def configure_callbacks(self):
-        from cameltrack.train.callbacks import SimMetrics, ClsMetrics # Only used for training
+        from cameltrack.train.callbacks import SimMetrics # Only used for training
         callbacks = [SimMetrics()]
-        if hasattr(self, "classifier"):
-            callbacks.append(ClsMetrics())
         return callbacks
 
     def on_save_checkpoint(self, checkpoint):
@@ -546,17 +400,17 @@ class CAMEL(pl.LightningModule):
         # Load custom attributes from the checkpoint dictionary
         self.computed_sim_threshold = checkpoint.get('computed_sim_threshold', None)
         self.computed_sim_threshold2 = checkpoint.get('computed_sim_threshold2', None)
-        self.best_distr_overlap_threshold = checkpoint.get(
-            'best_distr_overlap_threshold', None)
+        self.best_distr_overlap_threshold = checkpoint.get('best_distr_overlap_threshold', None)
         self.on_validation_end()
 
     def on_validation_end(self):
         if self.final_tracking_threshold is None or self.use_computed_threshold:
-            assert self.computed_sim_threshold is not None, "computed_sim_threshold or final_tracking_threshold must be set"
+            assert self.computed_sim_threshold is not None, \
+                "computed_sim_threshold or final_tracking_threshold must be set"
             self.final_tracking_threshold = self.computed_sim_threshold
-            log.info(
-                f"final_tracking_threshold set to {self.final_tracking_threshold} (use_computed_threshold={self.use_computed_threshold})")
+            log.info(f"final_tracking_threshold set to {self.final_tracking_threshold} "
+                     f"(use_computed_threshold={self.use_computed_threshold})")
         else:
-            log.info(
-                f"final_tracking_threshold already set to {self.final_tracking_threshold}. Skipping automatically computed value.")
+            log.info(f"final_tracking_threshold already set to {self.final_tracking_threshold}. "
+                     f"Skipping automatically computed value.")
         return

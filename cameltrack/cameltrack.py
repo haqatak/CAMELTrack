@@ -1,4 +1,3 @@
-import cv2
 import torch
 import numpy as np
 import logging
@@ -19,16 +18,15 @@ class Detection:
 
 class Tracklet(object):
     # MOT benchmark requires positive:
-    count = 1  # FIXME not thread safe
+    count = 1
 
     def __init__(self, detection, max_gallery_size, first_tracks=False):
         self.last_detection = detection
-        # self.token = detection.token
         self.detections = [detection]
         self.state = "init" if not first_tracks else "active"
         self.id = Tracklet.count
         Tracklet.count += 1
-
+        # Variables for tracklet management
         self.age = 0
         self.hits = 0
         self.hit_streak = 0
@@ -45,7 +43,7 @@ class Tracklet(object):
     def update(self, detection):
         self.detections.append(detection)
         self.detections = self.detections[-self.max_gallery_size:]
-        # tracklet management
+        # Variables for tracklet management
         self.hits += 1
         self.hit_streak += 1
         self.time_wo_hits = 0
@@ -67,26 +65,6 @@ class Tracklet(object):
                 f"num_detections={len(self.detections)})")
 
 
-
-def detect_change_of_view(prev_frame, actual_frame):  # TODO move elsewhere
-    # Perform frame differencing
-    diff = cv2.absdiff(prev_frame, actual_frame)
-
-    # Apply thresholding to highlight significant differences
-    _, threshold = cv2.threshold(diff, 30, 255, cv2.THRESH_BINARY)
-
-    # Apply morphological operations to remove noise
-    kernel = np.ones((3, 3), np.uint8)
-    threshold = cv2.morphologyEx(threshold, cv2.MORPH_OPEN, kernel)
-
-    # Calculate the percentage of changed pixels
-    changed_pixels = np.sum(threshold) / 255
-    total_pixels = threshold.shape[0] * threshold.shape[1]
-    change_percentage = changed_pixels / total_pixels
-
-    return change_percentage > 0.5
-
-
 @torch.no_grad()
 class CAMELTrack(object):
     def __init__(
@@ -95,24 +73,20 @@ class CAMELTrack(object):
             min_hits,
             max_wo_hits,
             max_gallery_size=50,
-            camera_motion_correction=False,  # fixme
             min_init_conf=0.4,
-            max_tracklet_memory_size=None,
+            *args,
             **kwargs,
     ):
         self.camel = camel.eval()
         self.min_hits = min_hits
         self.max_wo_hits = max_wo_hits
         self.max_gallery_size = max_gallery_size
-        self.camera_motion_correction = camera_motion_correction  # fixme
         self.tracklets = []
         self.frame_count = 0
         self.max_tracklet_memory_size = self.camel.transformer.max_track_ids if hasattr(self.camel.transformer, "max_track_ids") else None
         self.min_init_conf = min_init_conf
-        if self.max_tracklet_memory_size is not None:
-            log.info(f"DDSORT initialised with max_tracklet_memory_size={self.max_tracklet_memory_size} since EncoderWithIdTokens is used.")
 
-    def update(self, features, tracklab_ids, image_id, image):
+    def update(self, features, tracklab_ids, image_id):
         """
         Rough overview of the update method:
         1. forward each tracklet, update {age, time_wo_hits, hit_streak}
@@ -124,10 +98,6 @@ class CAMELTrack(object):
         7. return all active tracks
         """
         self.frame_count += 1
-
-        # camera motion compensation
-        if self.camera_motion_correction:
-            self.handle_camera_motion(image)
 
         # build detections from features
         detections = []
@@ -142,19 +112,19 @@ class CAMELTrack(object):
                 )
             )
 
-        # advance state of tracklets
+        # Update the states of the tracklets
         for track in self.tracklets:
             track.forward()
 
-        # associate detections to tracklets
+        # Associate detections to tracklets
         (
             matched,
             unmatched_trks,
             unmatched_dets,
             td_sim_matrix,
-        ) = self.associate_dets_to_trks(self.tracklets, detections, image)
+        ) = self.associate_dets_to_trks(self.tracklets, detections)
 
-        # assert each track and det index is present exactly once in matched or unmatched_trks or unmatched_dets
+        # Assert each track and det index is present exactly once in matched or unmatched_trks or unmatched_dets
         # Ensure that the track indices are all accounted for, and no duplicates in matched
         all_trk_indices = [m[0] for m in matched.tolist()] + unmatched_trks
         assert len(all_trk_indices) == len(self.tracklets)  # Ensure all indices are present
@@ -165,7 +135,7 @@ class CAMELTrack(object):
         assert len(all_det_indices) == len(detections)  # Ensure all indices are present
         assert len(set(all_det_indices)) == len(all_det_indices)  # Ensure no duplicates
 
-        # update matched tracklets with assigned detections
+        # Update matched tracklets with assigned detections
         for m in matched:
             tracklet = self.tracklets[m[0]]
             detection = detections[m[1]]
@@ -174,18 +144,19 @@ class CAMELTrack(object):
             detection.similarity_with_tracklet = similarity
             detection.similarities = td_sim_matrix[:len(self.tracklets), m[1]]
 
-        # create and initialise new tracklets for unmatched detections
+        # Create and initialise new tracklets for unmatched detections
         first_tracks = len(self.tracklets) == 0
         for i in unmatched_dets:
+            # Check that confidence is high enough
             if detections[i].bbox_conf < self.min_init_conf:
                 continue
             trk = Tracklet(detections[i], self.max_gallery_size, first_tracks=first_tracks)
             self.tracklets.append(trk)
 
-        # handle tracklets outputs and cleaning
+        # Handle tracklets outputs and cleaning
         actives = []
         for trk in self.tracklets:
-            # get active tracklets
+            # Get active tracklets
             self.update_state(trk)
             if trk.state == "active":
                 actives.append(
@@ -198,8 +169,7 @@ class CAMELTrack(object):
                         "time_since_update": trk.time_wo_hits,
                         "state": trk.state,
                         "costs": {
-                            "S": {self.tracklets[j].id: sim for j, sim in
-                                  enumerate(trk.last_detection.similarities.cpu().numpy())} if trk.last_detection.similarities is not None else None,
+                            "S": {self.tracklets[j].id: sim for j, sim in enumerate(trk.last_detection.similarities.cpu().numpy())} if trk.last_detection.similarities is not None else None,
                             "St": self.camel.sim_threshold,
                         }
                     }
@@ -212,14 +182,12 @@ class CAMELTrack(object):
                         "track_id": trk.id,  # id is computed from a counter
                         "hits": trk.hits,
                         "age": trk.age,
-                        "matched_with": ("S",
-                                         trk.last_detection.similarity_with_tracklet.cpu().numpy()) if trk.last_detection.similarity_with_tracklet is not None else None,
+                        "matched_with": ("S", trk.last_detection.similarity_with_tracklet.cpu().numpy()) if trk.last_detection.similarity_with_tracklet is not None else None,
                         "time_since_update": trk.time_wo_hits,
                         "state": trk.state,
                         "costs": {
                             "S": {self.tracklets[j].id: sim for j, sim in
-                                  enumerate(
-                                      trk.last_detection.similarities.cpu().numpy())} if trk.last_detection.similarities is not None else None,
+                                  enumerate( trk.last_detection.similarities.cpu().numpy())} if trk.last_detection.similarities is not None else None,
                             "St": self.camel.sim_threshold,
                         }
                     }
@@ -229,7 +197,7 @@ class CAMELTrack(object):
             self.tracklets = self.tracklets[-self.max_tracklet_memory_size:]
         return actives
 
-    def associate_dets_to_trks(self, tracklets, detections, image):
+    def associate_dets_to_trks(self, tracklets, detections):
         if len(tracklets) == 0:
             return (
                 np.empty((0, 2)),
@@ -245,120 +213,50 @@ class CAMELTrack(object):
                 np.empty((0,)),
             )
 
-        batch = self.build_camel_batch(tracklets, detections, self.camel.device, image)
+        batch = self.build_camel_batch(tracklets, detections, self.camel.device)
         association_matrix, association_result, td_sim_matrix = self.camel.predict_step(batch, self.frame_count)
         matched = association_result[0]["matched_td_indices"]
         unmatched_trks = association_result[0]["unmatched_trackers"]
         unmatched_dets = association_result[0]["unmatched_detections"]
         return matched, unmatched_trks, unmatched_dets, td_sim_matrix.squeeze(0)
 
-    # def matched_td_indices(self, tracklet_detection_matrix):
-    #     # Convert the input matrix to a PyTorch tensor
-    #     matrix_tensor = torch.tensor(tracklet_detection_matrix, dtype=torch.float32)
-    #
-    #     # Find matched pairs (tracklet, detection)
-    #     matched_pairs = []
-    #     while matrix_tensor.sum() > 0:
-    #         max_val, max_idx = torch.max(matrix_tensor, dim=1)
-    #         tracklet_idx = torch.argmax(max_val)
-    #         detection_idx = max_idx[tracklet_idx].item()
-    #
-    #         if max_val[tracklet_idx] > 0:
-    #             matched_pairs.append((tracklet_idx, detection_idx))
-    #             matrix_tensor[tracklet_idx, :] = 0
-    #             matrix_tensor[:, detection_idx] = 0
-    #
-    #     # Find unmatched detections and tracklets
-    #     unmatched_dets = torch.nonzero(matrix_tensor.sum(dim=0)).squeeze().tolist()
-    #     unmatched_trks = torch.nonzero(matrix_tensor.sum(dim=1)).squeeze().tolist()
-    #
-    #     return matched_pairs, unmatched_dets, unmatched_trks
-
-    def build_camel_batch(self, tracklets, detections, device, image):  # TODO UGLY - refactor
+    def build_camel_batch(self, tracklets, detections, device):  # TODO UGLY - refactor
         T_max = np.array([len(t.detections) for t in tracklets]).max()
         batch = {
-            "images": [torch.from_numpy(image)],
             'image_id': detections[0].image_id,  # int
-            "det_feats": {
-                'visibility_scores': torch.stack([det.visibility_scores for det in detections]).unsqueeze(1).unsqueeze(
-                    0).to(device=device),  # [1, N, 1, 7]
-                'embeddings': torch.stack([det.embeddings for det in detections]).unsqueeze(1).unsqueeze(
-                    0).to(device=device),  # [1, N, 1, 7*D]
-                'index': torch.IntTensor([det.tracklab_id for det in detections]).unsqueeze(1).unsqueeze(0).to(
-                    device=device),  # [1, N, 1]
-                'bbox_conf': torch.stack([det.bbox_conf for det in detections]).unsqueeze(1).unsqueeze(1).unsqueeze(
-                    0).to(device=device),  # [1, N, 1, 1]
-                'bbox_ltwh': torch.stack([det.bbox_ltwh for det in detections]).unsqueeze(1).unsqueeze(0).to(
-                    device=device),  # [1, N, 1, 4]
-                'keypoints_xyc': torch.stack([det.keypoints_xyc for det in detections]).unsqueeze(1).unsqueeze(0).to(
-                    device=device),  # [1, N, 1, 17, 3]
-                'age': torch.zeros(len(detections), device=device).unsqueeze(1).unsqueeze(1).unsqueeze(0), # [B, N, 1, 1]
-                'iou_occlusion': torch.stack([det.iou_occlusion for det in detections])
-                .unsqueeze(1)
-                .unsqueeze(1)
-                .unsqueeze(0)
-                .to(device=device),  # [1, N, 1, 1]
-                'im_width': torch.stack([det.im_width for det in detections])
-                .unsqueeze(1)
-                .unsqueeze(1)
-                .unsqueeze(0)
-                .to(device=device),  # [1, N, 1, 1]
-                'im_height': torch.stack([det.im_height for det in detections])
-                .unsqueeze(1)
-                .unsqueeze(1)
-                .unsqueeze(0)
-                .to(device=device),  # [1, N, 1, 1]
-                },
-            'det_masks': torch.ones((1, len(detections), 1), device=device, dtype=torch.bool),  # [1, N, 1]
-            "track_feats": {
-                'visibility_scores': torch.stack(
-                    [t.padded_features("visibility_scores", T_max) for t in tracklets]).unsqueeze(0).to(device=device),
-                # [1, N, T, 7]
-                'embeddings': torch.stack(
-                    [t.padded_features("embeddings", T_max) for t in
-                     tracklets]).unsqueeze(0).to(device=device),  # [1, N, T, 7*D]
-                'index': torch.stack([t.padded_features("tracklab_id", T_max) for t in tracklets]).unsqueeze(0).to(
-                    device=device),  # [1, N, T]
-                'bbox_conf': torch.stack([t.padded_features("bbox_conf", T_max) for t in tracklets]).unsqueeze(
-                    2).unsqueeze(0).to(device=device),  # [1, N, T, 1]
-                'bbox_ltwh': torch.stack([t.padded_features("bbox_ltwh", T_max) for t in tracklets]).unsqueeze(0).to(
-                    device=device),  # [1, N, T, 4]
-                'keypoints_xyc': torch.stack([t.padded_features("keypoints_xyc", T_max) for t in tracklets]).unsqueeze(
-                    0).to(device=device),  # [1, N, T, 17, 3]
-                'age': self.frame_count - 1 - torch.stack(
-                    [t.padded_features("frame_idx", T_max) for t in tracklets]).unsqueeze(2).unsqueeze(0).to(
-                    device=device),  # [1, N, T, 1]
-                'iou_occlusion': torch.stack([t.padded_features("iou_occlusion", T_max) for t in tracklets]).unsqueeze(
-                    2).unsqueeze(0).to(device=device),  # [1, N, T, 1]
-                'im_width': torch.stack([t.padded_features("im_width", T_max) for t in tracklets]).unsqueeze(
-                    2).unsqueeze(0).to(device=device),  # [1, N, T, 1]
-                'im_height': torch.stack([t.padded_features("im_height", T_max) for t in tracklets]).unsqueeze(
-                    2).unsqueeze(0).to(device=device),  # [1, N, T, 1]
+            'det_feats': {
+                'visibility_scores': torch.stack([det.visibility_scores for det in detections]).unsqueeze(1).unsqueeze(0).to(device=device),  # [1, N, 1, 7]
+                'embeddings': torch.stack([det.embeddings for det in detections]).unsqueeze(1).unsqueeze(0).to(device=device),  # [1, N, 1, 7*D]
+                'index': torch.IntTensor([det.tracklab_id for det in detections]).unsqueeze(1).unsqueeze(0).to(device=device),  # [1, N, 1]
+                'bbox_conf': torch.stack([det.bbox_conf for det in detections]).unsqueeze(1).unsqueeze(1).unsqueeze(0).to(device=device),  # [1, N, 1, 1]
+                'bbox_ltwh': torch.stack([det.bbox_ltwh for det in detections]).unsqueeze(1).unsqueeze(0).to(device=device),  # [1, N, 1, 4]
+                'keypoints_xyc': torch.stack([det.keypoints_xyc for det in detections]).unsqueeze(1).unsqueeze(0).to(device=device),  # [1, N, 1, 17, 3]
+                'age': torch.zeros(len(detections), device=device).unsqueeze(1).unsqueeze(1).unsqueeze(0),  # [B, N, 1, 1]
+                'im_width': torch.stack([det.im_width for det in detections]).unsqueeze(1).unsqueeze(1).unsqueeze(0).to(device=device),  # [1, N, 1, 1]
+                'im_height': torch.stack([det.im_height for det in detections]).unsqueeze(1).unsqueeze(1).unsqueeze(0).to(device=device),  # [1, N, 1, 1]
             },
-            'track_masks': torch.stack([torch.cat([torch.ones(len(t.detections), dtype=torch.bool),
-                                                   torch.zeros(T_max - len(t.detections), dtype=torch.bool)]) for t in
-                                        tracklets]).unsqueeze(0).to(device=device),  # [1, N, T]
+            'det_masks': torch.ones((1, len(detections), 1), device=device, dtype=torch.bool),  # [1, N, 1]
+            'track_feats': {
+                'visibility_scores': torch.stack([t.padded_features("visibility_scores", T_max) for t in tracklets]).unsqueeze(0).to(device=device),  # [1, N, T, 7]
+                'embeddings': torch.stack([t.padded_features("embeddings", T_max) for t in tracklets]).unsqueeze(0).to(device=device),  # [1, N, T, 7*D]
+                'index': torch.stack([t.padded_features("tracklab_id", T_max) for t in tracklets]).unsqueeze(0).to(device=device),  # [1, N, T]
+                'bbox_conf': torch.stack([t.padded_features("bbox_conf", T_max) for t in tracklets]).unsqueeze(2).unsqueeze(0).to(device=device),  # [1, N, T, 1]
+                'bbox_ltwh': torch.stack([t.padded_features("bbox_ltwh", T_max) for t in tracklets]).unsqueeze(0).to(device=device),  # [1, N, T, 4]
+                'keypoints_xyc': torch.stack([t.padded_features("keypoints_xyc", T_max) for t in tracklets]).unsqueeze(0).to(device=device),  # [1, N, T, 17, 3]
+                'age': self.frame_count - 1 - torch.stack([t.padded_features("frame_idx", T_max) for t in tracklets]).unsqueeze(2).unsqueeze(0).to(device=device),  # [1, N, T, 1]
+                'im_width': torch.stack([t.padded_features("im_width", T_max) for t in tracklets]).unsqueeze(2).unsqueeze(0).to(device=device),  # [1, N, T, 1]
+                'im_height': torch.stack([t.padded_features("im_height", T_max) for t in tracklets]).unsqueeze(2).unsqueeze(0).to(device=device),  # [1, N, T, 1]
+            },
+            'track_masks': torch.stack([torch.cat([torch.ones(len(t.detections), dtype=torch.bool), torch.zeros(T_max - len(t.detections), dtype=torch.bool)]) for t in tracklets]).unsqueeze(0).to(device=device),  # [1, N, T]
         }
 
         if hasattr(detections[0], "target"):
-            batch["det_targets"] = torch.stack([det.target for det in detections]).unsqueeze(1).unsqueeze(1).unsqueeze(
-                        0).to(device=device)
-            batch["track_targets"] = torch.stack([t.padded_features("target", T_max) for t in tracklets]).unsqueeze(
-                        2).unsqueeze(0).to(device=device)
+            batch["det_targets"] = torch.stack([det.target for det in detections]).unsqueeze(1).unsqueeze(1).unsqueeze(0).to(device=device)
+            batch["track_targets"] = torch.stack([t.padded_features("target", T_max) for t in tracklets]).unsqueeze(2).unsqueeze(0).to(device=device)
         return batch
 
-    def handle_camera_motion(self, frame):
-        raise NotImplementedError()
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        if hasattr(self, "prev_frame") and len(self.tracklets) > 0:
-            has_changed = detect_change_of_view(self.prev_frame, frame)
-            if has_changed:
-                pass
-            else:
-                pass
-        self.prev_frame = frame
-
     def update_state(self, tracklet):
+        # Transition tracklet state based on simple rules
         s = tracklet.state
         if s == "init":
             if tracklet.hit_streak >= self.min_hits:

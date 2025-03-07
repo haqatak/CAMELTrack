@@ -22,7 +22,7 @@ train_cfg:
     val_check_interval: null
     fast_dev_run: false
 cameltrack:
-  sort:
+  tracker:
     _target_: cameltrack.CAMELTrack
     _enabled_: true
     min_hits: 0
@@ -33,41 +33,28 @@ det_filter_cfg:
   min_vis_keypoints: null
   vis_keypoint_threshold: null
   min_bbox_threshold: 0.4
+
 CAMEL:
-  transformer_cfg:
+  gaffe_cfg:
     _target_: cameltrack.architecture.Encoder
     emb_dim: 1024
     n_heads: 8
     n_layers: 4
     dim_feedforward: 2048
     dropout: 0.1
-    activation_fn: relu
-    use_processed_track_tokens: true
-    src_key_padding_mask: true
     checkpoint_path: null
-    enable_track_det_token: false
-    enable_src_norm: true
-    enable_src_drop: true
-    enable_xavier_init: false
   tokenizers_cfg:
     app_encoder:
       _target_: cameltrack.architecture.TemporalEncoder
       _enabled_: true
       _recursive_: false
       hidden_dim: 512
-      output_dim: ${...transformer_cfg.emb_dim}
+      output_dim: ${...gaffe_cfg.emb_dim}
       n_heads: 8
       n_layers: 4
       dim_feedforward: 1024
-      num_registers: 0
       dropout: 0.1
       checkpoint_path: null
-      occlusion_threshold: null
-      pass_detections: true
-      output_strat: cls
-      use_pe: true
-      use_drop: true
-      use_norm: true
       freeze: false
       det_tokenizer:
         _target_: cameltrack.architecture.DetTokenizer
@@ -79,19 +66,12 @@ CAMEL:
       _enabled_: true
       _recursive_: false
       hidden_dim: 128
-      output_dim: ${...transformer_cfg.emb_dim}
+      output_dim: ${...gaffe_cfg.emb_dim}
       n_heads: 8
       n_layers: 4
       dim_feedforward: 256
-      num_registers: 0
       dropout: 0.1
       checkpoint_path: null
-      occlusion_threshold: null
-      pass_detections: true
-      output_strat: cls
-      use_pe: true
-      use_drop: true
-      use_norm: true
       freeze: false
       det_tokenizer:
         _target_: cameltrack.architecture.DetTokenizer
@@ -103,19 +83,12 @@ CAMEL:
       _enabled_: true
       _recursive_: false
       hidden_dim: 64
-      output_dim: ${...transformer_cfg.emb_dim}
+      output_dim: ${...gaffe_cfg.emb_dim}
       n_heads: 8
       n_layers: 4
       dim_feedforward: 128
-      num_registers: 0
       dropout: 0.1
       checkpoint_path: null
-      occlusion_threshold: null
-      pass_detections: true
-      output_strat: cls
-      use_pe: true
-      use_drop: true
-      use_norm: true
       freeze: false
       det_tokenizer:
         _target_: cameltrack.architecture.DetTokenizer
@@ -128,15 +101,12 @@ CAMEL:
   assos_strat: hungarian
   use_computed_threshold: false
   sim_threshold: 0.1
-  loss_strat: infoNCE
-  norm_coords: positive
-  tl_margin: 0.2
-  contrastive_loss_strat: inter
+
   train_cfg:
     init_lr: 0.0001
     weight_decay: 0.0001
     alpha_loss: 1.0
-  classifier_cfg: null
+
 datamodule:
   batch_transforms:
     train:
