@@ -52,9 +52,9 @@ class TemporalEncoder(Module):
 
         # init weights and freeze
         if name is not None:
-            self.init_weights(checkpoint_path=checkpoint_path, module_name=f"tokenizers.{name}")
+            self.init_weights(checkpoint_path=checkpoint_path, module_name=f"temp_encs.{name}")
         else:
-            self.init_weights(checkpoint_path=checkpoint_path, module_name="tokenizers.TrackletEncoder")
+            self.init_weights(checkpoint_path=checkpoint_path, module_name="temp_encs.TrackletEncoder")
         if freeze:
             for name, param in self.named_parameters():
                 if name.startswith('linear_out'):
@@ -111,89 +111,3 @@ class PositionalEncoding(nn.Module):
         age[mask] = age[mask].clamp(min=0, max=self.max_len - 1)
         x[mask] = x[mask] + self.pe[age[mask]]
         return x.view(B, N, S, E)
-
-
-class BBoxLinProj(Module):
-    def __init__(self, hidden_dim, use_conf, dropout: float = 0.1):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.use_conf = use_conf
-        self.dropout = dropout
-
-        in_features = 4 + (1 if use_conf else 0)
-        self.linear = nn.Linear(in_features, hidden_dim, bias=True)
-        self.drop = nn.Dropout(dropout)
-
-    def forward(self, x):
-        bbox_feats = x.feats["bbox_ltwh"]
-        if self.use_conf:
-            bbox_feats = torch.cat([bbox_feats, x.feats["bbox_conf"]], dim=-1)
-        output = self.drop(self.linear(bbox_feats[x.feats_masks]))
-        if "drop_bbox" in x.feats:
-            output[x.feats["drop_bbox"][x.feats_masks].squeeze() == 1] = 0.
-        return output
-
-
-class KeypointsLinProj(Module):
-    def __init__(self, hidden_dim, use_conf, dropout: float = 0.1):
-        super().__init__()
-        self.token_dim = hidden_dim
-        self.use_conf = use_conf
-        self.dropout = dropout
-
-        in_features = 17 * 2 + (17 if use_conf else 0)
-        self.linear = nn.Linear(in_features, hidden_dim, bias=True)
-        self.drop = nn.Dropout(dropout)
-
-    def forward(self, x):
-        keypoints_feats = x.feats["keypoints_xyc"]
-        if not self.use_conf:
-            keypoints_feats = keypoints_feats[..., :2]
-        keypoints_feats = keypoints_feats.reshape(*x.feats_masks.shape, -1)
-        output = self.drop(self.linear(keypoints_feats[x.feats_masks]))
-        if "drop_kps" in x.feats:
-            output[x.feats["drop_kps"][x.feats_masks].squeeze() == 1] = 0.
-        return output
-
-
-class EmbeddingsLinProj(Module):
-    def __init__(self, hidden_dim, use_parts, num_parts: int = 5, emb_size: int = 128, dropout: float = 0.1):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        self.use_parts = use_parts
-        self.num_parts = num_parts
-        self.emb_size = emb_size
-        self.dropout = dropout
-
-        self.linears = nn.ModuleList([nn.Linear(emb_size, hidden_dim, bias=True)] * (num_parts + 1 if use_parts else 1))
-        self.drop = nn.Dropout(dropout)
-
-    def forward(self, x):
-        embeddings = x.feats["embeddings"] * x.feats["visibility_scores"].unsqueeze(-1)  # [B, N, S, num_parts, emb_size]
-        output = self.linears[0](embeddings[x.feats_masks][:, 0, :])
-        for i, linear in enumerate(self.linears[1:]):
-            output += linear(embeddings[x.feats_masks][:, i + 1, :]) * x.feats["visibility_scores"][x.feats_masks][:, i + 1].unsqueeze(-1)
-        output = self.drop(output)
-        if "drop_app" in x.feats:
-            output[x.feats["drop_app"][x.feats_masks].squeeze() == 1] = 0.
-        return output
-
-
-class DetTokenizer(Module):
-    def __init__(self, hidden_dim, feats_tokenizers):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        module_list = []
-        for feats_tokenizer in feats_tokenizers:
-            module_list.append(instantiate(feats_tokenizer, hidden_dim=hidden_dim))
-        self.feats_tokenizers = nn.ModuleList(module_list)
-
-    def forward(self, x):
-        tokens = torch.zeros(
-            (*x.feats_masks.shape, self.hidden_dim),
-            device=x.feats_masks.device,
-            dtype=torch.float32,
-        )
-        for feats_tokenizer in self.feats_tokenizers:
-            tokens[x.feats_masks] += feats_tokenizer(x)
-        return tokens
