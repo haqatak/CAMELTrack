@@ -32,7 +32,7 @@ class GAFFE(Module):
         self.src_drop = nn.Dropout(dropout)
 
         encoder_layers = nn.TransformerEncoderLayer(
-            self.emb_dim, self.n_heads, self.dim_feedforward, self.dropout, batch_first=True, activation=self.activation_fn
+            self.emb_dim, self.n_heads, self.dim_feedforward, self.dropout, batch_first=True, activation='relu'
         )
         self.encoder = nn.TransformerEncoder(encoder_layers, self.n_layers)
 

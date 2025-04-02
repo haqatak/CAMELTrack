@@ -70,21 +70,25 @@ class CAMELTrack(object):
     def __init__(
             self,
             camel,
-            min_hits,
-            max_wo_hits,
-            max_gallery_size=50,
-            min_init_conf=0.4,
+            min_det_conf: float = 0.4,
+            min_init_det_conf: float  = 0.6,
+            min_num_hits: int = 0,
+            max_wo_hits: int = 150,
+            max_track_gallery_size: int = 50,
             *args,
             **kwargs,
     ):
         self.camel = camel.eval()
-        self.min_hits = min_hits
+        self.min_det_conf = min_det_conf
+        self.min_init_det_conf = min_init_det_conf
+        self.min_num_hits = min_num_hits
         self.max_wo_hits = max_wo_hits
-        self.max_gallery_size = max_gallery_size
+        self.max_track_gallery_size = max_track_gallery_size
+
         self.tracklets = []
         self.frame_count = 0
-        self.max_tracklet_memory_size = self.camel.transformer.max_track_ids if hasattr(self.camel.transformer, "max_track_ids") else None
-        self.min_init_conf = min_init_conf
+        self.max_tracklet_memory_size = self.camel.gaffe.max_track_ids if (
+            hasattr(self.camel.gaffe, "max_track_ids")) else None  # FIXME what is this ?
 
     def update(self, features, tracklab_ids, image_id):
         """
@@ -93,7 +97,7 @@ class CAMELTrack(object):
         2. perform data association between existing tracklets and new detections
         3. update all track with matched det: update detections list, last_detection, hits, hit_streak, time_wo_hits
         4. init track with unmatched dets
-        5. update state of all tracklets: init ( hit_streak < min_hits) -> active -> lost (time_wo_hits < max_wo_hits) -> dead
+        5. update state of all tracklets: init ( hit_streak < min_num_hits) -> active -> lost (time_wo_hits < max_wo_hits) -> dead
         6. update track list by removing dead tracklets
         7. return all active tracks
         """
@@ -103,14 +107,15 @@ class CAMELTrack(object):
         detections = []
         for i in range(len(tracklab_ids)):
             features_i = {k: v[0, i] for k, v in features.items()}
-            detections.append(
-                Detection(
-                    image_id,
-                    features_i,
-                    tracklab_ids[i],
-                    frame_idx=self.frame_count - 1
+            if features_i["bbox_conf"] >= self.min_det_conf:
+                detections.append(
+                    Detection(
+                        image_id,
+                        features_i,
+                        tracklab_ids[i],
+                        frame_idx=self.frame_count - 1
+                    )
                 )
-            )
 
         # Update the states of the tracklets
         for track in self.tracklets:
@@ -148,9 +153,9 @@ class CAMELTrack(object):
         first_tracks = len(self.tracklets) == 0
         for i in unmatched_dets:
             # Check that confidence is high enough
-            if detections[i].bbox_conf < self.min_init_conf:
+            if detections[i].bbox_conf < self.min_init_det_conf:
                 continue
-            trk = Tracklet(detections[i], self.max_gallery_size, first_tracks=first_tracks)
+            trk = Tracklet(detections[i], self.max_track_gallery_size, first_tracks=first_tracks)
             self.tracklets.append(trk)
 
         # Handle tracklets outputs and cleaning
@@ -175,7 +180,7 @@ class CAMELTrack(object):
                     }
                 )
             # for first frames, also return tracklets in init state but not confirm them as active
-            elif trk.state == "init" and self.frame_count <= self.min_hits:
+            elif trk.state == "init" and self.frame_count <= self.min_num_hits:
                 actives.append(
                     {
                         "tracklab_id": trk.last_detection.tracklab_id.item(),
@@ -259,7 +264,7 @@ class CAMELTrack(object):
         # Transition tracklet state based on simple rules
         s = tracklet.state
         if s == "init":
-            if tracklet.hit_streak >= self.min_hits:
+            if tracklet.hit_streak >= self.min_num_hits:
                 new_state = "active"
             elif tracklet.time_wo_hits >= 1:
                 new_state = "dead"

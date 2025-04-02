@@ -11,7 +11,8 @@ from pytorch_metric_learning import distances, losses, reducers
 
 from cameltrack.utils.merge_token_strats import merge_token_strats
 from cameltrack.utils.similarity_metrics import similarity_metrics
-from cameltrack.utils import coordinates, assignment_strats
+from cameltrack.utils.assignment_strats import association_strats
+from cameltrack.utils.coordinates import norm_coords_strats
 
 log = logging.getLogger(__name__)
 
@@ -87,13 +88,13 @@ class CAMEL(pl.LightningModule):
     def __init__(
             self,
             gaffe_cfg: DictConfig,
-            temp_enc_cfg: DictConfig,
+            temp_encs_cfg: DictConfig,
             train_cfg: DictConfig = None,
-            batch_transforms: DictConfig = None,
             merge_token_strat: str = "sum",
-            sim_strat: str = "cosine",
+            sim_strat: str = "norm_euclidean",
+            ass_strat: str = "hungarian_algorithm",
             sim_threshold: int = 0.5,  # fixme this should be in CAMELTrack
-            use_computed_threshold: bool = True,  # fixme this should be in CAMELTrack
+            use_computed_threshold: bool = False,  # fixme this should be in CAMELTrack
     ):
         super().__init__()
         all_params = locals()  # Get all arguments passed to __init__
@@ -101,13 +102,14 @@ class CAMEL(pl.LightningModule):
         self.save_hyperparameters(ignore=ignore_keys)
 
         self.gaffe = instantiate(gaffe_cfg)  # TODO : remove dependency to Hydra
-        self.tokenizers = nn.ModuleDict({n: instantiate(t, name=n) for n, t in temp_enc_cfg.items() if t['_enabled_']})
+        self.temp_encs = nn.ModuleDict({n: instantiate(t, output_dim=gaffe_cfg.emb_dim, name=n, _recursive_=False) for n, t in temp_encs_cfg.items()})
         self.train_cfg = train_cfg
         self.merge_token_strat = merge_token_strat
         if sim_strat == "default_for_each_token_type":
             log.warning("sim_strat set to 'default_for_each_token_type', setting merge_token_strat to 'identity'.")
             self.merge_token_strat = "identity"
         self.sim_strat = sim_strat
+        self.ass_strat = ass_strat
         self.computed_sim_threshold = None
         self.computed_sim_threshold2 = None
         self.best_distr_overlap_threshold = None
@@ -116,14 +118,7 @@ class CAMEL(pl.LightningModule):
         self.use_computed_threshold = use_computed_threshold
         log.info(f"CAMEL initialized with final_tracking_threshold={sim_threshold} from yaml config. "
                  f"Will be overwritten later by an optimized threshold if CAMEL validation is enabled.")
-        self.norm_coords = coordinates.norm_coords_strats["positive"]
-
-        # handle instantiation functions
-        if batch_transforms is not None:
-            self.batch_transforms = {n: instantiate(t) for n, t in
-                                     batch_transforms.items()}
-        else:
-            self.batch_transforms = {}
+        self.norm_coords = norm_coords_strats["positive"]
 
         # merging
         if self.merge_token_strat in merge_token_strats:
@@ -138,7 +133,10 @@ class CAMEL(pl.LightningModule):
             raise NotImplementedError
 
         # association
-        self.association = assignment_strats.hungarian_algorithm
+        if ass_strat in association_strats:
+            self.association = association_strats[ass_strat]
+        else:
+            raise NotImplementedError
 
         # loss on sim
         distance = distances.CosineSimilarity()
@@ -187,8 +185,7 @@ class CAMEL(pl.LightningModule):
         td_sim_matrix = self.similarity(tracks, dets)  # embs -> sim_matrix
         return tracks, dets, td_sim_matrix
 
-    def train_val_preprocess(self,
-                             batch):  # TODO merge with predict_preprocess, compute det/trask masks in getitem
+    def train_val_preprocess(self, batch):  # TODO merge with predict_preprocess, compute det/trask masks in getitem
         """
         :param batch:
             dict of tensors containing the inputs features and targets of detections and tracklets
@@ -243,16 +240,16 @@ class CAMEL(pl.LightningModule):
 
     def tokenize(self, tracks, dets):
         """
-        Operate the tokenization step for the differents tokenizers
+        Operate the tokenization step for the differents temp_encs
         :param dets: Detections
         :param tracks: Tracklets
         :return: updated dets and tracks with partial tokens in a dict not merged
         """
         tracks.tokens = {}
         dets.tokens = {}
-        for n, t in self.tokenizers.items():
-            tracks.tokens[n] = t(tracks)
-            dets.tokens[n] = t(dets)
+        for name, temp_enc in self.temp_encs.items():
+            tracks.tokens[name] = temp_enc(tracks)
+            dets.tokens[name] = temp_enc(dets)
         return tracks, dets
 
     def similarity(self, tracks, dets):
@@ -267,7 +264,7 @@ class CAMEL(pl.LightningModule):
                 # each token type has its own default distance (reid = cosine, bbox = iou, etc).
                 # Use that default distance for a heuristic that would, for instance, combine IoU with cosine distance.
                 if self.sim_strat == "default_for_each_token_type":
-                    sm = similarity_metrics[self.tokenizers[tokenizer_name].default_similarity_metric]
+                    sm = similarity_metrics[self.temp_encs[tokenizer_name].default_similarity_metric]
                     td_sim_matrix.append(sm(t, tracks.masks, d, dets.masks))
                 else:
                     td_sim_matrix.append(self.similarity_metric(t, tracks.masks, d, dets.masks))
@@ -347,12 +344,12 @@ class CAMEL(pl.LightningModule):
             param_groups = [
                 {
                     'params': [p for n, p in self.named_parameters() if
-                               not n.startswith('tokenizers')],
+                               not n.startswith('temp_encs')],
                     'lr': self.train_cfg.init_lr
                 },
                 {
                     'params': [p for n, p in self.named_parameters() if
-                               n.startswith('tokenizers')],
+                               n.startswith('temp_encs')],
                     'lr': self.train_cfg.init_lr / 10
                     # Slower learning rate for tokenizer
                 }
