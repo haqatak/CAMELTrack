@@ -4,8 +4,7 @@ import torch
 from scipy.optimize import linear_sum_assignment
 
 
-def hungarian_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0.0,
-                        **kwargs):
+def hungarian_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0.0, **kwargs):
     """
     apply hungarian algorithm on sim_matrix with the entries in valid_dets and valid_tracks
 
@@ -67,8 +66,7 @@ def hungarian_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0
     return association_matrix, association_result
 
 
-def greedy_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0.0,
-                     special_tokens=False, **kwargs):
+def greedy_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0.0, **kwargs):
     B, T, D = td_sim_matrix.shape
     association_matrix = torch.zeros_like(td_sim_matrix, dtype=torch.bool)
     association_result = []
@@ -76,8 +74,7 @@ def greedy_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0.0,
         if valid_tracks[b].sum() > 0 and valid_dets[b].sum() > 0:
             sim_matrix_masked = td_sim_matrix[b, valid_tracks[b], :][:, valid_dets[b]]
             sim_matrix_masked[sim_matrix_masked < sim_threshold] = 0.0
-            row_idx, col_idx = greedy_assignment(sim_matrix_masked.cpu(), sim_threshold,
-                                                 special_tokens)
+            row_idx, col_idx = greedy_assignment(sim_matrix_masked.cpu(), sim_threshold)
 
             valid_rows = torch.nonzero(valid_tracks[b]).squeeze(dim=1).cpu()
             valid_cols = torch.nonzero(valid_dets[b]).squeeze(dim=1).cpu()
@@ -89,28 +86,10 @@ def greedy_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0.0,
             unmatched_detections = [d.item() for d in valid_cols if
                                     d.item() not in set(valid_cols[col_idx].tolist())]
 
-            if special_tokens:
-                # remove special tokens from unmatched
-                unmatched_trackers = [t for t in unmatched_trackers if t < T - 1]
-                unmatched_detections = [d for d in unmatched_detections if d < D - 1]
-
-                assert all([d < D - 1 for d in unmatched_detections])
-                assert all([t < T - 1 for t in unmatched_trackers])
-
             matches = []
             for m in matched_td_indices:
                 association_matrix[b, m[0], m[1]] = True
-                if special_tokens and (m[0] == T - 1) and (
-                        m[1] == D - 1):  # special tokens are matched
-                    pass
-                elif special_tokens and (
-                        m[0] == T - 1):  # a detection is matched to the special token
-                    unmatched_detections.append(m[1])
-                elif special_tokens and (
-                        m[1] == D - 1):  # a tracklet is matched to the special token
-                    unmatched_trackers.append(m[0])
-                elif td_sim_matrix[b, m[0], m[
-                    1]] < sim_threshold:  # a tracklet-to-detection match is below the threshold
+                if td_sim_matrix[b, m[0], m[1]] < sim_threshold:  # a tracklet-to-detection match is below the threshold
                     unmatched_trackers.append(m[0])
                     unmatched_detections.append(m[1])
                 else:
@@ -127,17 +106,6 @@ def greedy_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0.0,
                 unmatched_detections = torch.nonzero(valid_dets[b]).squeeze(
                     dim=1).tolist()
 
-        if special_tokens:
-            assert all([d < D - 1 for d in unmatched_detections])
-            assert all([t < T - 1 for t in unmatched_trackers])
-
-            actual_binary_ass_matrix = association_matrix[b, :-1, :-1]
-
-            actual_binary_ass_matrix.cpu().numpy()
-
-            assert actual_binary_ass_matrix.sum(dim=1).max() < 2
-            assert actual_binary_ass_matrix.sum(dim=0).max() < 2
-
         association_result.append(
             {
                 "matched_td_indices": matched_td_indices,
@@ -148,7 +116,7 @@ def greedy_algorithm(td_sim_matrix, valid_tracks, valid_dets, sim_threshold=0.0,
     return association_matrix, association_result
 
 
-def greedy_assignment(td_sim_matrix, threshold, special_tokens=False):
+def greedy_assignment(td_sim_matrix, threshold):
     """
     Greedy assignment method for tracklet-detection association.
 
@@ -177,19 +145,10 @@ def greedy_assignment(td_sim_matrix, threshold, special_tokens=False):
     for sim, i, j in pairs:
         if sim < threshold:
             break
-        if special_tokens:
-            if (i not in assigned_tracklets and j not in assigned_detections) or \
-                    (i == td_sim_matrix.shape[
-                        0] - 1 and j not in assigned_detections) or \
-                    (j == td_sim_matrix.shape[1] - 1 and i not in assigned_tracklets):
-                assignments.append((i, j))
-                assigned_tracklets.add(i)
-                assigned_detections.add(j)
-        else:
-            if i not in assigned_tracklets and j not in assigned_detections:
-                assignments.append((i, j))
-                assigned_tracklets.add(i)
-                assigned_detections.add(j)
+        if i not in assigned_tracklets and j not in assigned_detections:
+            assignments.append((i, j))
+            assigned_tracklets.add(i)
+            assigned_detections.add(j)
 
     return [t[0] for t in assignments], [t[1] for t in assignments]
 
@@ -269,3 +228,9 @@ def argmax_assignment(sim_matrix):
         final_row_idx.append(row)
         final_col_idx.append(col)
     return final_row_idx, final_col_idx
+
+association_strats = {
+    "hungarian_algorithm": hungarian_algorithm,
+    "greedy_algorithm": greedy_algorithm,
+    "argmax_algorithm": argmax_algorithm,
+}

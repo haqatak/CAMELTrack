@@ -40,28 +40,21 @@ class SimMetrics(pl.Callback):
         self.roc.update(valid_sim_matrix, valid_gt_ass_matrix)
         self.auroc.update(valid_sim_matrix, valid_gt_ass_matrix)
 
-        if tracks.special_tokens or dets.special_tokens:
-            binary_ass_matrix, _ = pl_module.association(td_sim_matrix, tracks.masks, dets.masks, special_tokens=tracks.special_tokens or dets.special_tokens)  # FIXME use best th from previous epoch
-            actual_binary_ass_matrix = binary_ass_matrix[:, :-1, :-1]
-        else:
-            # old accuracy code, could be removed
-            intersection = torch.eq(tracks.targets.unsqueeze(dim=2), dets.targets.unsqueeze(dim=1))
-            inter_tracks_masks = intersection.any(dim=2)
-            inter_dets_masks = intersection.any(dim=1)
-            binary_ass_matrix, _ = pl_module.association(td_sim_matrix, inter_tracks_masks, inter_dets_masks)
-            actual_binary_ass_matrix = binary_ass_matrix
+        # old accuracy code, could be removed
+        intersection = torch.eq(tracks.targets.unsqueeze(dim=2), dets.targets.unsqueeze(dim=1))
+        inter_tracks_masks = intersection.any(dim=2)
+        inter_dets_masks = intersection.any(dim=1)
+        binary_ass_matrix, _ = pl_module.association(td_sim_matrix, inter_tracks_masks, inter_dets_masks)
+        actual_binary_ass_matrix = binary_ass_matrix
 
         # assert one to one match:
         assert actual_binary_ass_matrix.sum(dim=2).max() < 2
         assert actual_binary_ass_matrix.sum(dim=1).max() < 2
 
-        if tracks.special_tokens or dets.special_tokens:
-            preds, targets = compute_tracklet_detection_preds_targets(binary_ass_matrix, gt_ass_matrix, tracks.masks, dets.masks)
-        else:
-            # binary_ass_matrix and gt_ass_matrix computed before
-            idx = torch.arange(td_sim_matrix.numel(), device=td_sim_matrix.device).reshape(td_sim_matrix.shape)
-            preds = idx[binary_ass_matrix]
-            targets = idx[gt_ass_matrix]
+        # binary_ass_matrix and gt_ass_matrix computed before
+        idx = torch.arange(td_sim_matrix.numel(), device=td_sim_matrix.device).reshape(td_sim_matrix.shape)
+        preds = idx[binary_ass_matrix]
+        targets = idx[gt_ass_matrix]
         self.acc.update(preds, targets)
 
         # fixme new roc check if it is ok and clean

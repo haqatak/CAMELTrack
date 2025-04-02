@@ -174,11 +174,8 @@ class CAMEL(pl.LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         tracks, dets = self.predict_preprocess(batch)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
-        association_matrix, association_result = self.association(td_sim_matrix,
-                                                                  tracks.masks,
-                                                                  dets.masks,
-                                                                  sim_threshold=self.final_tracking_threshold,
-                                                                  special_tokens=tracks.special_tokens or dets.special_tokens)
+        association_matrix, association_result = self.association(td_sim_matrix, tracks.masks, dets.masks,
+                                                                  sim_threshold=self.final_tracking_threshold)
         # plt = display_bboxes(tracks, dets, None, batch["images"])
         # plt.show()
         return association_matrix, association_result, td_sim_matrix
@@ -314,8 +311,8 @@ class CAMEL(pl.LightningModule):
                 masked_det_embs = dets_embs[i, dets.masks[i]]
                 masked_det_targets = dets.targets[i, dets.masks[i]]
 
-                if (not tracks.special_tokens and (len(masked_det_embs) != 0 or len(masked_track_embs) != 0)) \
-                    or (tracks.special_tokens and (len(masked_det_embs) > 1 or len(masked_track_embs) > 1)):
+                if ((len(masked_det_embs) != 0 or len(masked_track_embs) != 0)
+                        or (len(masked_det_embs) > 1 or len(masked_track_embs) > 1)):
                     mask_sim_loss[h, i] = True
 
                     # Compute embeddings loss on all tracks/detections (track_ids >= 0)
