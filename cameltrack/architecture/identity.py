@@ -1,6 +1,6 @@
 import logging
 
-from plugins.track.dd_sort.simformer.modules.transformers.base_module import Module
+from cameltrack.architecture.base_module import Module
 
 log = logging.getLogger(__name__)
 

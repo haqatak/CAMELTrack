@@ -75,4 +75,4 @@ def iou_matrix(objs, hyps, max_iou=1.):
     assert hyps.shape[1] == 4
     iou = boxiou(objs[:, None], hyps[None, :])
     dist = 1 - iou
-    return np.where(dist > max_iou, np.nan, dist)
+    return np.where(dist > max_iou, 1e10, dist)

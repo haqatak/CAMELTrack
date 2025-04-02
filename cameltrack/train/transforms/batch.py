@@ -2,7 +2,7 @@ import logging
 
 import torch
 
-from dd_sort.simformer.transforms import BatchTransform
+from cameltrack.train.transforms import BatchTransform
 
 log = logging.getLogger(__name__)
 

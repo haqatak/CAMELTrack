@@ -36,7 +36,7 @@ def set_worker_sharing_strategy(worker_id: int) -> None:
     torch.multiprocessing.set_sharing_strategy("file_system")
 
 
-class SimFormerDataset(Dataset):
+class CAMELDataset(Dataset):
     feature_names = ["age",
                      "bbox_ltwh",
                      "bbox_conf",
@@ -44,7 +44,6 @@ class SimFormerDataset(Dataset):
                      "visibility_scores",
                      "embeddings",
                      "image_id",
-                     "iou_occlusion",
                      "im_width",
                      "im_height",
                      "drop_app",
@@ -276,7 +275,7 @@ def collate_fn(batch, batch_size=np.nan):
     return batch
 
 
-class SimFormerDataModule(pl.LightningDataModule):
+class CAMELDataModule(pl.LightningDataModule):
     """DataModule to create and manage tracking-specific datasets.
 
     Args:
@@ -434,7 +433,7 @@ class SimFormerDataModule(pl.LightningDataModule):
                 kwargs = dict(tracklet_transforms=self.tracklet_transforms[dataset_split])
             kwargs = {**kwargs, "max_length": self.max_length}
             video_ids = [f"sample_{video_id}.pkl" for video_id in self.detections[set_name].video_id.unique()]
-            self.datasets[set_name] = SimFormerDataset(
+            self.datasets[set_name] = CAMELDataset(
                 self.detections_paths[set_name],
                 self.dataset_configs[set_name],
                 video_ids=video_ids,

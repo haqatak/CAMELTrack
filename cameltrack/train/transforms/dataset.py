@@ -4,11 +4,35 @@ import torch
 from scipy.optimize import linear_sum_assignment
 
 from tqdm import tqdm
-from dd_sort.simformer.transforms import OfflineTransforms
-from tracklab.engine.engine import merge_dataframes
+from cameltrack.train.transforms import OfflineTransforms
 from tracklab.utils.cv2 import cv2_load_image
 from cameltrack.utils.distances import iou_matrix
 
+
+def merge_dataframes(main_df, appended_piece):  # FIXME should be imported from tracklab but circular import issue
+    # Convert appended_piece to a DataFrame if it's not already
+    if isinstance(appended_piece, pd.Series):
+        appended_piece = pd.DataFrame(appended_piece).T
+    elif isinstance(appended_piece, list):  # list of Series or DataFrames
+        if len(appended_piece) > 0:
+            appended_piece = pd.concat(
+                [s.to_frame().T if type(s) is pd.Series else s for s in appended_piece]
+            )
+        else:
+            appended_piece = pd.DataFrame()
+
+    # Append the columns of the df
+    new_columns = appended_piece.columns.difference(main_df.columns)
+    main_df.loc[:, new_columns] = np.nan
+
+    # Append the rows of the df
+    new_index = set(appended_piece.index).difference(main_df.index)
+    for index in new_index:
+        main_df.loc[index] = np.nan
+
+    # Update all the values (appended_piece overrides)
+    main_df.update(appended_piece)
+    return main_df
 
 
 def add_crops(df, metadatas, **_):
