@@ -89,12 +89,12 @@ class CAMEL(pl.LightningModule):
             self,
             gaffe_cfg: DictConfig,
             temp_encs_cfg: DictConfig,
+            sim_threshold: int = 0.5,
+            use_computed_threshold: bool = False,
             train_cfg: DictConfig = None,
             merge_token_strat: str = "sum",
             sim_strat: str = "norm_euclidean",
             ass_strat: str = "hungarian_algorithm",
-            sim_threshold: int = 0.5,  # fixme this should be in CAMELTrack
-            use_computed_threshold: bool = False,  # fixme this should be in CAMELTrack
     ):
         super().__init__()
         all_params = locals()  # Get all arguments passed to __init__
@@ -378,11 +378,6 @@ class CAMEL(pl.LightningModule):
                 "interval": "step",
             },
         }
-
-    def configure_callbacks(self):
-        from cameltrack.train.callbacks import SimMetrics # Only used for training
-        callbacks = [SimMetrics()]
-        return callbacks
 
     def on_save_checkpoint(self, checkpoint):
         # Add custom attributes to the checkpoint dictionary

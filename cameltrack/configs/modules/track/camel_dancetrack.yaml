@@ -1,16 +1,14 @@
-_target_: cameltrack.utils.CAMELTrackLauncher
-_recursive_: false
+_target_: cameltrack.CAMELTrack
+
 training_enabled: false
 checkpoint_path: null
-override_cfg: null
+override_camel_cfg: null
 
-CAMELTrack:
-  _target_: cameltrack.CAMELTrack
-  min_det_conf: 0.4
-  min_init_det_conf: 0.9
-  min_num_hits: 0
-  max_wo_hits: 150
-  max_track_gallery_size: 50
+min_det_conf: 0.4
+min_init_det_conf: 0.9
+min_num_hits: 0
+max_wo_hits: 150
+max_track_gallery_size: 50
 
 CAMEL:
   _target_: cameltrack.CAMEL
@@ -77,7 +75,7 @@ train_cfg:
     val_check_interval: null
     fast_dev_run: false
 
-datamodule:
+datamodule_cfg:
   _target_: cameltrack.train.CAMELDataModule
   batch_transforms:
     train:
@@ -137,3 +135,5 @@ datamodule:
   - add_last_obs_counter
   - add_occlusions
   - add_dim_image
+
+_recursive_: false
