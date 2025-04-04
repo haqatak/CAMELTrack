@@ -1,10 +1,11 @@
 import logging
 from dataclasses import dataclass
 
-import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+import pytorch_lightning as pl
 import transformers
+
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 from pytorch_metric_learning import distances, losses, reducers
@@ -67,85 +68,59 @@ class Detections(Tracklets):
 
 
 class CAMEL(pl.LightningModule):
-    """ CAMEL Transformer : .
 
-    Args:
-      transformer_cfg: dict containing the transformer backbone architecture
-      tokenizers_cfg: dict containing the tokenizers for each cue (key: cue name)
-      classifier_cfg: DEPRECATED
-      train_cfg: dict containing training configuration
-      batch_transforms: dict with "train"/"val"/"test" keys with an instantiatable dict.
-      merge_token_strat: sum/identity/concat
-      sim_strat: default_for_each_token_type/cosine/euclidean/norm_euclidean/iou/random
-      assos_strat: hungarian/argmax/greedy
-      sim_threshold: Threshold for similarity measure
-      use_computed_threshold: if True, use threshold computed during validation
-      tl_margin: ???
-      loss_strat: triplet/infoNCE
-      contrastive_loss_strat: inter/inter_intra/valid_inter/valid_inter_intra
-      norm_coords: centered/positive/None
-    """
     def __init__(
             self,
             gaffe_cfg: DictConfig,
             temp_encs_cfg: DictConfig,
             sim_threshold: int = 0.5,
-            use_computed_threshold: bool = False,
+            use_computed_sim_threshold: bool = False,
             train_cfg: DictConfig = None,
             merge_token_strat: str = "sum",
             sim_strat: str = "norm_euclidean",
             ass_strat: str = "hungarian_algorithm",
+            norm_strat: str = "positive",
     ):
         super().__init__()
-        all_params = locals()  # Get all arguments passed to __init__
-        ignore_keys = [key for key in all_params if "checkpoint_path" in key]
-        self.save_hyperparameters(ignore=ignore_keys)
+        self.save_hyperparameters(ignore=[key for key in locals() if "checkpoint_path" in key])
 
-        self.gaffe = instantiate(gaffe_cfg)  # TODO : remove dependency to Hydra
+        self.gaffe = instantiate(gaffe_cfg)
         self.temp_encs = nn.ModuleDict({n: instantiate(t, output_dim=gaffe_cfg.emb_dim, name=n, _recursive_=False) for n, t in temp_encs_cfg.items()})
-        self.train_cfg = train_cfg
-        self.merge_token_strat = merge_token_strat
-        if sim_strat == "default_for_each_token_type":
-            log.warning("sim_strat set to 'default_for_each_token_type', setting merge_token_strat to 'identity'.")
-            self.merge_token_strat = "identity"
-        self.sim_strat = sim_strat
-        self.ass_strat = ass_strat
-        self.computed_sim_threshold = None
-        self.computed_sim_threshold2 = None
-        self.best_distr_overlap_threshold = None
-        self.sim_threshold = sim_threshold
-        self.final_tracking_threshold = sim_threshold
-        self.use_computed_threshold = use_computed_threshold
-        log.info(f"CAMEL initialized with final_tracking_threshold={sim_threshold} from yaml config. "
-                 f"Will be overwritten later by an optimized threshold if CAMEL validation is enabled.")
-        self.norm_coords = norm_coords_strats["positive"]
 
-        # merging
+        self.sim_threshold = sim_threshold
+        self.use_computed_sim_threshold = use_computed_sim_threshold
+        self.computed_sim_threshold = None
+        if use_computed_sim_threshold:
+            log.warning(f"CAMEL initialized with final_tracking_threshold={sim_threshold} from the configuration file. "
+                        "This value will be updated later with an optimized threshold if CAMEL validation is enabled.")
+
+        self.merge_token_strat = "identity" if sim_strat == "default_for_each_token_type" else merge_token_strat
         if self.merge_token_strat in merge_token_strats:
             self.merge = merge_token_strats[self.merge_token_strat]
         else:
             raise NotImplementedError
 
-        # similarity
         if sim_strat in similarity_metrics:
             self.similarity_metric = similarity_metrics[sim_strat]
         else:
             raise NotImplementedError
 
-        # association
         if ass_strat in association_strats:
             self.association = association_strats[ass_strat]
         else:
             raise NotImplementedError
 
-        # loss on sim
-        distance = distances.CosineSimilarity()
-        reducer = reducers.AvgNonZeroReducer()
-        self.sim_loss = losses.NTXentLoss(distance=distance, reducer=reducer)
+        if norm_strat in norm_coords_strats:
+            self.norm_coords = norm_coords_strats[norm_strat]
+        else:
+            raise NotImplementedError
+
+        self.train_cfg = train_cfg
+        self.sim_loss = losses.NTXentLoss(distance=distances.CosineSimilarity(), reducer=reducers.AvgNonZeroReducer())
+
 
     def training_step(self, batch, batch_idx):
         tracks, dets = self.train_val_preprocess(batch)
-        self.sanity_checks(tracks, dets)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
         loss = self.compute_loss(tracks, dets, td_sim_matrix)
         self.log_loss(loss, "train")
@@ -158,7 +133,6 @@ class CAMEL(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         tracks, dets = self.train_val_preprocess(batch)
-        self.sanity_checks(tracks, dets)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
         loss = self.compute_loss(tracks, dets, td_sim_matrix)
         self.log_loss(loss, "val")
@@ -172,10 +146,8 @@ class CAMEL(pl.LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         tracks, dets = self.predict_preprocess(batch)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
-        association_matrix, association_result = self.association(td_sim_matrix, tracks.masks, dets.masks,
-                                                                  sim_threshold=self.final_tracking_threshold)
-        # plt = display_bboxes(tracks, dets, None, batch["images"])
-        # plt.show()
+        sim_threshold = self.computed_sim_threshold if (self.use_computed_sim_threshold and self.computed_sim_threshold) else self.sim_threshold
+        association_matrix, association_result = self.association(td_sim_matrix, tracks.masks, dets.masks, sim_threshold=sim_threshold)
         return association_matrix, association_result, td_sim_matrix
 
     def forward(self, tracks, dets):
@@ -215,28 +187,6 @@ class CAMEL(pl.LightningModule):
         dets = Detections(batch["det_feats"], batch["det_masks"],
                           batch["det_targets"] if "det_targets" in batch else None)
         return tracks, dets
-
-    def sanity_checks(self, tracks, dets):
-        """
-
-        """
-
-        # Function to check for duplicates in each batch
-        def check_no_duplicate_integers(tensor):
-            B, N = tensor.shape
-
-            for i in range(B):
-                batch = tensor[i]
-                # Filter out NaNs using ~torch.isnan()
-                filtered_integers = batch[~torch.isnan(batch)].int()
-                # Check if the number of unique values matches the length of the filtered integers
-                if len(filtered_integers) != len(torch.unique(filtered_integers)):
-                    raise AssertionError(f"Duplicate target found in batch {i}")
-            print("No duplicates found!")
-            return True
-
-        # assert check_no_duplicate_integers(tracks.targets)
-        # assert check_no_duplicate_integers(dets.targets)
 
     def tokenize(self, tracks, dets):
         """
@@ -308,8 +258,7 @@ class CAMEL(pl.LightningModule):
                 masked_det_embs = dets_embs[i, dets.masks[i]]
                 masked_det_targets = dets.targets[i, dets.masks[i]]
 
-                if ((len(masked_det_embs) != 0 or len(masked_track_embs) != 0)
-                        or (len(masked_det_embs) > 1 or len(masked_track_embs) > 1)):
+                if ((len(masked_det_embs) != 0 or len(masked_track_embs) != 0) or (len(masked_det_embs) > 1 or len(masked_track_embs) > 1)):
                     mask_sim_loss[h, i] = True
 
                     # Compute embeddings loss on all tracks/detections (track_ids >= 0)
@@ -329,9 +278,8 @@ class CAMEL(pl.LightningModule):
         return sim_loss
 
     def log_loss(self, loss, step):
-        loss_dict = {f"{step}/loss": loss}
         self.log_dict(
-            loss_dict,
+            {f"{step}/loss": loss},
             on_epoch=True,
             on_step="train" == step,
             prog_bar="train" == step,
@@ -339,67 +287,19 @@ class CAMEL(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        if hasattr(self.train_cfg, "finetune_tokenizers") and self.train_cfg.finetune_tokenizers:
-            # Split parameters into tokenizer and non-tokenizer groups
-            param_groups = [
-                {
-                    'params': [p for n, p in self.named_parameters() if
-                               not n.startswith('temp_encs')],
-                    'lr': self.train_cfg.init_lr
-                },
-                {
-                    'params': [p for n, p in self.named_parameters() if
-                               n.startswith('temp_encs')],
-                    'lr': self.train_cfg.init_lr / 10
-                    # Slower learning rate for tokenizer
-                }
-            ]
-            optimizer = torch.optim.AdamW(
-                param_groups,
-                weight_decay=self.train_cfg.weight_decay,
-            )
-        else:
-            optimizer = torch.optim.AdamW(
-                self.parameters(),
-                lr=self.train_cfg.init_lr,
-                weight_decay=self.train_cfg.weight_decay,
-            )
-        estimated_steps = self.trainer.estimated_stepping_batches
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.train_cfg.init_lr, weight_decay=self.train_cfg.weight_decay)
         scheduler = transformers.get_cosine_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=estimated_steps / 20,
-            # FIXME very slow, call a lot of get_items
-            num_training_steps=estimated_steps,
+            num_warmup_steps=self.trainer.estimated_stepping_batches // 20,
+            num_training_steps=self.trainer.estimated_stepping_batches,
         )
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "interval": "step",
-            },
-        }
+        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "step"}}
 
     def on_save_checkpoint(self, checkpoint):
         # Add custom attributes to the checkpoint dictionary
         checkpoint['computed_sim_threshold'] = self.computed_sim_threshold
-        checkpoint['computed_sim_threshold2'] = self.computed_sim_threshold2
-        checkpoint['best_distr_overlap_threshold'] = self.best_distr_overlap_threshold
 
     def on_load_checkpoint(self, checkpoint):
         # Load custom attributes from the checkpoint dictionary
         self.computed_sim_threshold = checkpoint.get('computed_sim_threshold', None)
-        self.computed_sim_threshold2 = checkpoint.get('computed_sim_threshold2', None)
-        self.best_distr_overlap_threshold = checkpoint.get('best_distr_overlap_threshold', None)
         self.on_validation_end()
-
-    def on_validation_end(self):
-        if self.final_tracking_threshold is None or self.use_computed_threshold:
-            assert self.computed_sim_threshold is not None, \
-                "computed_sim_threshold or final_tracking_threshold must be set"
-            self.final_tracking_threshold = self.computed_sim_threshold
-            log.info(f"final_tracking_threshold set to {self.final_tracking_threshold} "
-                     f"(use_computed_threshold={self.use_computed_threshold})")
-        else:
-            log.info(f"final_tracking_threshold already set to {self.final_tracking_threshold}. "
-                     f"Skipping automatically computed value.")
-        return

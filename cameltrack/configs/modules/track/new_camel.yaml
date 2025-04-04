@@ -13,6 +13,7 @@ max_track_gallery_size: 50
 CAMEL:
   _target_: cameltrack.CAMEL
   sim_threshold: 0.1
+  use_computed_sim_threshold: false
   gaffe_cfg:
     _target_: cameltrack.architecture.GAFFE
     emb_dim: 1024

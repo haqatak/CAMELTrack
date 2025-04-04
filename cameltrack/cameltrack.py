@@ -10,7 +10,7 @@ from pathlib import Path
 
 from omegaconf import DictConfig
 
-from cameltrack.train.callbacks import PairsStatistics, SimMetrics
+from cameltrack.train.callbacks import SimMetrics
 
 from tracklab.pipeline import ImageLevelModule
 from tracklab.datastruct import TrackingDataset
@@ -165,6 +165,85 @@ class CAMELTrack(ImageLevelModule):
         unmatched_dets = association_result[0]["unmatched_detections"]
         return matched, unmatched_trks, unmatched_dets, td_sim_matrix.squeeze(0)
 
+
+    @torch.no_grad()
+    def update_state(self, tracklet):
+        s = tracklet.state
+        if s == "init":
+            new_state = "active" if tracklet.hit_streak >= self.min_num_hits else "dead" if tracklet.time_wo_hits >= 1 else "init"
+        elif s == "active":
+            new_state = "active" if tracklet.time_wo_hits == 0 else "lost" if tracklet.time_wo_hits < self.max_wo_hits else "dead"
+        elif s == "lost":
+            new_state = "active" if tracklet.time_wo_hits == 0 else "lost" if tracklet.time_wo_hits < self.max_wo_hits else "dead"
+        elif s == "dead":
+            new_state = "dead"
+        else:
+            raise ValueError(f"Tracklet {tracklet} is in undefined state {s}.")
+        tracklet.state = new_state
+
+    def train(self, tracking_dataset, pipeline, evaluator, datasets, *args, **kwargs):
+        datasets = {dn: dv for dn, dv in datasets.items() if dn in self.datamodule_cfg.multi_dataset_training} if self.datamodule_cfg.multi_dataset_training else {}
+        self.datamodule = instantiate(self.datamodule_cfg, tracking_dataset=tracking_dataset, pipeline=pipeline, datasets=datasets)
+
+        save_best_loss = pl.callbacks.ModelCheckpoint(
+            monitor="val/loss",
+            dirpath="CAMEL",
+            mode="min",
+            filename="epoch={epoch}-loss={val/loss:.4f}",
+            auto_insert_metric_name=False,
+            save_last=True,
+        )
+
+        callbacks = [
+            save_best_loss,
+            pl.callbacks.LearningRateMonitor(),
+            SimMetrics(),
+        ]
+
+        if self.train_cfg.use_rich:
+            callbacks.append(pl.callbacks.RichProgressBar())
+
+        logger = pl.loggers.WandbLogger(project="CAMEL", resume=True) if self.train_cfg.use_wandb else pl.loggers.WandbLogger(project="CAMEL", offline=True)
+
+        tr_cfg = self.train_cfg.pl_trainer
+        trainer = pl.Trainer(
+            max_epochs=tr_cfg.max_epochs,
+            logger=logger,
+            callbacks=callbacks,
+            accelerator=self.device,
+            num_sanity_val_steps=tr_cfg.num_sanity_val_steps,
+            fast_dev_run=tr_cfg.fast_dev_run,
+            precision=tr_cfg.precision,
+            gradient_clip_val=tr_cfg.gradient_clip_val,
+            accumulate_grad_batches=tr_cfg.accumulate_grad_batches,
+            log_every_n_steps=tr_cfg.log_every_n_steps,
+            check_val_every_n_epoch=tr_cfg.check_val_every_n_epochs,
+            val_check_interval=tr_cfg.val_check_interval,
+            enable_progress_bar=tr_cfg.enable_progress_bar,
+            profiler=tr_cfg.profiler,
+            enable_model_summary=tr_cfg.enable_model_summary,
+        )
+
+        if not self.train_cfg.evaluate_only:
+            ckpt_path = Path("CAMEL/last.ckpt") if Path("CAMEL/last.ckpt").exists() else None
+            trainer.fit(self.CAMEL, self.datamodule, ckpt_path=ckpt_path)
+
+            if self.train_cfg.model_selection_criteria == "best_loss":
+                checkpoint_path = save_best_loss.best_model_path or save_best_loss.last_model_path
+            elif self.train_cfg.model_selection_criteria == "last":
+                checkpoint_path = save_best_loss.last_model_path
+            else:
+                log.warning(f"No recognized mode selection criteria {self.train_cfg.model_selection_criteria}. Using last checkpoint.")
+                checkpoint_path = save_best_loss.last_model_path
+
+            if checkpoint_path:
+                log.info(f"Loading CAMEL checkpoint from `{Path(checkpoint_path).resolve()}`.")
+                type(self.CAMEL).load_from_checkpoint(checkpoint_path, map_location=self.device)
+            else:
+                log.warning("No CAMEL checkpoint found.")
+
+        trainer.validate(self.CAMEL, self.datamodule)
+
     @torch.no_grad()
     def build_camel_batch(self, tracklets, detections):  # TODO UGLY - refactor
         T_max = max(len(t.detections) for t in tracklets)
@@ -204,84 +283,6 @@ class CAMELTrack(ImageLevelModule):
 
         return batch
 
-    @torch.no_grad()
-    def update_state(self, tracklet):
-        s = tracklet.state
-        if s == "init":
-            new_state = "active" if tracklet.hit_streak >= self.min_num_hits else "dead" if tracklet.time_wo_hits >= 1 else "init"
-        elif s == "active":
-            new_state = "active" if tracklet.time_wo_hits == 0 else "lost" if tracklet.time_wo_hits < self.max_wo_hits else "dead"
-        elif s == "lost":
-            new_state = "active" if tracklet.time_wo_hits == 0 else "lost" if tracklet.time_wo_hits < self.max_wo_hits else "dead"
-        elif s == "dead":
-            new_state = "dead"
-        else:
-            raise ValueError(f"Tracklet {tracklet} is in undefined state {s}.")
-        tracklet.state = new_state
-
-    def train(self, tracking_dataset, pipeline, evaluator, datasets, *args, **kwargs):
-        if self.datamodule_cfg.multi_dataset_training:
-            datasets = {dn: dv for dn, dv in datasets.items() if dn in self.datamodule_cfg.multi_dataset_training}
-        else:
-            datasets = {}
-        self.datamodule = instantiate(self.datamodule_cfg, tracking_dataset=tracking_dataset, pipeline=pipeline, datasets=datasets)
-        save_best_loss = pl.callbacks.ModelCheckpoint(
-            monitor="val/loss",
-            dirpath="CAMEL",
-            mode="min",
-            filename="epoch={epoch}-loss={val/loss:.4f}",
-            auto_insert_metric_name=False,
-            save_last=True,
-        )
-        callbacks = [
-            save_best_loss,
-            pl.callbacks.LearningRateMonitor(),
-            PairsStatistics(),
-            SimMetrics(),
-            # pl.callbacks.EarlyStopping(monitor="val/loss", patience=self.train_cfg.pl_trainer.max_epochs / 5,
-            #                           mode="min", check_on_train_epoch_end=False),
-        ]
-        if self.train_cfg.use_rich:
-            callbacks.append(pl.callbacks.RichProgressBar())
-        if self.train_cfg.use_wandb:
-            logger = pl.loggers.WandbLogger(project="CAMEL", resume=True)
-        else:
-            logger = pl.loggers.WandbLogger(project="CAMEL", offline=True)
-        tr_cfg = self.train_cfg.pl_trainer
-        trainer = pl.Trainer(
-            max_epochs=tr_cfg.max_epochs,
-            logger=logger,
-            callbacks=callbacks,
-            accelerator=self.device,
-            num_sanity_val_steps=tr_cfg.num_sanity_val_steps,
-            fast_dev_run=tr_cfg.fast_dev_run,
-            precision=tr_cfg.precision,
-            gradient_clip_val=tr_cfg.gradient_clip_val,
-            accumulate_grad_batches=tr_cfg.accumulate_grad_batches,
-            log_every_n_steps=tr_cfg.log_every_n_steps,
-            check_val_every_n_epoch=tr_cfg.check_val_every_n_epochs,
-            val_check_interval=tr_cfg.val_check_interval,
-            enable_progress_bar=tr_cfg.enable_progress_bar,
-            profiler=tr_cfg.profiler,
-            enable_model_summary=tr_cfg.enable_model_summary,
-        )
-        if not self.train_cfg.evaluate_only:
-            last_path = Path("CAMEL/last.ckpt")
-            ckpt_path = last_path if last_path.exists() else None
-            trainer.fit(self.CAMEL, self.datamodule, ckpt_path=ckpt_path)
-            if self.train_cfg.model_selection_criteria == "best_loss":
-                checkpoint_path = save_best_loss.best_model_path if save_best_loss.best_model_path else save_best_loss.last_model_path
-            elif self.train_cfg.model_selection_criteria == "last":
-                checkpoint_path = save_best_loss.last_model_path
-            else:
-                log.warning(f"No recognized mode selection criteria {self.train_cfg.model_selection_criteria}. Using last checkpoint.")
-                checkpoint_path = save_best_loss.last_model_path
-            if checkpoint_path:
-                log.info(f"Loading CAMEL checkpoint from `{Path(checkpoint_path).resolve()}`.")
-                type(self.CAMEL).load_from_checkpoint(checkpoint_path, map_location=self.device)
-            else:
-                log.warning("No CAMEL checkpoint found.")
-        trainer.validate(self.CAMEL, self.datamodule)
 
 class Detection:
     def __init__(self, image_id, features, tracklab_id, frame_idx):

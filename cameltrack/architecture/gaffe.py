@@ -15,8 +15,8 @@ class GAFFE(Module):
         dim_feedforward: int = 2048,
         dropout: float = 0.1,
         checkpoint_path: str = None,
-        enable_xavier_init: bool = True,
-        *args, **kwargs,
+        *args,
+        **kwargs,
     ):
         super().__init__()
         self.emb_dim = emb_dim
@@ -24,8 +24,6 @@ class GAFFE(Module):
         self.n_layers = n_layers
         self.dim_feedforward = dim_feedforward
         self.dropout = dropout
-
-        self.enable_xavier_init = enable_xavier_init
 
         self.cls = nn.Parameter(torch.zeros(emb_dim), requires_grad=True)  # required when a batch is empty, because without the cls token the attention would be totally false on some rows, and the model would return nan@
         self.src_norm = nn.LayerNorm(emb_dim)
@@ -36,17 +34,9 @@ class GAFFE(Module):
         )
         self.encoder = nn.TransformerEncoder(encoder_layers, self.n_layers)
 
-        self.init_weights(checkpoint_path=checkpoint_path, module_name="transformer")
-
-        if self.enable_xavier_init:
-            for p in self.parameters():
-                if p.dim() > 1:
-                    nn.init.xavier_uniform_(p)
+        self.init_weights(checkpoint_path=checkpoint_path, module_name="gaffe")
 
     def forward(self, tracks, dets):
-        assert not torch.any(torch.isnan(tracks.tokens))  # FIXME still nans from MB or reid?
-        assert not torch.any(torch.isnan(dets.tokens))
-
         src = torch.cat([dets.tokens, tracks.tokens, self.cls.repeat(dets.masks.shape[0], 1, 1)], dim=1)
         src = self.src_norm(src)
         src = self.src_drop(src)
@@ -63,8 +53,5 @@ class GAFFE(Module):
 
         tracks.embs = x[:, dets.masks.shape[1]: dets.masks.shape[1] + tracks.masks.shape[1]]  # [B, T(+P), E]
         dets.embs = x[:, :dets.masks.shape[1]]  # [B, D(+P), E]
-
-        assert not torch.any(torch.isnan(tracks.embs))
-        assert not torch.any(torch.isnan(dets.embs))
 
         return tracks, dets
