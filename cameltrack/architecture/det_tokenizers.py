@@ -3,8 +3,6 @@ import torch.nn as nn
 
 from cameltrack.architecture.base_module import Module
 
-from hydra.utils import instantiate
-
 
 class BBoxLinProj(Module):
     def __init__(self, hidden_dim, use_conf, dropout: float = 0.1):
@@ -87,24 +85,4 @@ class PartsEmbeddingsLinProj(Module):
             dtype=torch.float32,
         )
         tokens[x.feats_masks] = output
-        return tokens
-
-
-class DetTokenizer(Module):
-    def __init__(self, hidden_dim, feats_tokenizers):
-        super().__init__()
-        self.hidden_dim = hidden_dim
-        module_list = []
-        for feats_tokenizer in feats_tokenizers:
-            module_list.append(instantiate(feats_tokenizer, hidden_dim=hidden_dim))
-        self.feats_tokenizers = nn.ModuleList(module_list)
-
-    def forward(self, x):
-        tokens = torch.zeros(
-            (*x.feats_masks.shape, self.hidden_dim),
-            device=x.feats_masks.device,
-            dtype=torch.float32,
-        )
-        for feats_tokenizer in self.feats_tokenizers:
-            tokens[x.feats_masks] += feats_tokenizer(x)
         return tokens

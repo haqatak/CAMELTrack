@@ -100,6 +100,7 @@ class CAMEL(pl.LightningModule):
         else:
             raise NotImplementedError
 
+        self.sim_strat = sim_strat
         if sim_strat in similarity_metrics:
             self.similarity_metric = similarity_metrics[sim_strat]
         else:
