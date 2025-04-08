@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 from typing import List
 
 from torchvision.ops import MLP
 
 from cameltrack.architecture.base_module import Module
+from cameltrack.utils.kalman_filter import Detection, Track
 
 class LastBbox(Module):
     """
@@ -13,7 +15,7 @@ class LastBbox(Module):
     """
 
     def __init__(self,
-            output_dim,
+            output_dim: int,
             use_mlp: bool = False,
             hidden_channels: List[int] = [16, 32],
             checkpoint_path: str = None,
@@ -62,7 +64,7 @@ class PartsEmbeddingsEMA(Module):
     default_similarity_metric = "cosine"
 
     def __init__(self,
-             output_dim,
+             output_dim: int,
              use_lin_proj: bool = False,
              use_parts: bool = True,
              num_parts: int = 5,
@@ -161,53 +163,50 @@ class PartsEmbeddingsEMA(Module):
                         new_masks[b, n, 0] = True
         return new_embeddings, new_vis, new_masks
 
-# TODO
-"""
-class KFTokenizer(Module):
-    default_similarity_metric = "cosine"
 
-    def __init__(self, feat_dim: int, token_dim: int, hidden_channels: List[int], freeze=False,
-                 checkpoint_path: str = None, no_mlp=False, max_length=20, kf_orig=False, use_confidence=False, kf_mode="KalmanBoxTracker", **kwargs):
+class KFBbox(Module):
+    # FIXME could be cleaned a bit more
+    def __init__(self,
+             output_dim: int,
+             max_length: int = 20,
+             use_mlp: bool = False,
+             use_confidence: bool = False,
+             hidden_channels: List[int] = [16, 32],
+             checkpoint_path: str = None,
+             **kwargs
+         ):
         super().__init__()
-        self.feat_dim = feat_dim
-        self.token_dim = token_dim
-        self.hidden_channels = hidden_channels
-        self.freeze = freeze
-        self.no_mlp = no_mlp
+        self.output_dim = output_dim
         self.max_length = max_length
-        self.kf_orig = kf_orig
-        self.kf_mode = kf_mode
         self.use_confidence = use_confidence
-        self.default_similarity_metric = "iou" if self.no_mlp else "cosine"
+
+        self.use_mlp = use_mlp
+        self.hidden_channels = hidden_channels
         self.mlp = MLP(
-            in_channels=self.feat_dim,
-            hidden_channels=self.hidden_channels + [self.token_dim],
+            in_channels=4,
+            hidden_channels=hidden_channels + [self.output_dim],
             norm_layer=nn.BatchNorm1d,
             activation_layer=nn.ReLU,
             bias=True,
         )
 
-        self.init_weights(checkpoint_path=checkpoint_path, module_name="tokenizers.MotionBertTokenizer")
+        self.default_similarity_metric = "cosine" if self.use_mlp else "iou"
 
-        if self.freeze:
-            for param in self.parameters():
-                param.requires_grad = False
+        self.init_weights(checkpoint_path=checkpoint_path, module_name="temp_encs.kfbbox")
 
-    def forward(self, tracklets):
-        # kf_pred__bboxes = tracklets.feats['bbox_ltwh'][:, :, 0]
-        kf_pred__bboxes = self._get_kf_predictions(tracklets) if tracklets.feats['bbox_ltwh'].shape[2] > 1 else tracklets.feats['bbox_ltwh'][:, :, 0]
-        if self.no_mlp:
+    def forward(self, x):
+        kf_pred__bboxes = self._get_kf_predictions(x) if x.feats['bbox_ltwh'].shape[2] > 1 else x.feats['bbox_ltwh'][:, :, 0]
+        if not self.use_mlp:
             return kf_pred__bboxes
-        valid_last_bboxes_mask = tracklets.feats_masks[..., 0].flatten()
+        valid_last_bboxes_mask = x.feats_masks[..., 0].flatten()
         valid_last_bboxes = kf_pred__bboxes.flatten(0, 1)[valid_last_bboxes_mask]
         valid_bbox_features = self.mlp(valid_last_bboxes)
-        bbox_features = torch.zeros((len(valid_last_bboxes_mask), self.token_dim), device=valid_bbox_features.device)
+        bbox_features = torch.zeros((len(valid_last_bboxes_mask), self.output_dim), device=valid_bbox_features.device)
         bbox_features[valid_last_bboxes_mask] = valid_bbox_features
-        bbox_features = bbox_features.unflatten(0, tracklets.feats_masks[..., 0].shape)
+        bbox_features = bbox_features.unflatten(0, x.feats_masks[..., 0].shape)
         return bbox_features
 
     def _get_kf_predictions(self, tracklets):
-        standard_img_shape = [1920, 1080]
         device = tracklets.feats['bbox_ltwh'].device
 
         # Convert tensors to numpy and handle batch dimension
@@ -237,16 +236,9 @@ class KFTokenizer(Module):
                             highest_non_nan_idx = -1  # Return -1 if no valid bbox is found
 
                         bbox_ltwh = tracklet_bbox_ltwh[highest_non_nan_idx]
-                        if self.kf_mode == "KalmanBoxTracker":
-                            bbox_ltrb = bbox_ltwh2ltrb(bbox_ltwh)
-                            bbox_ltrb = unnormalize_bbox(bbox_ltrb, standard_img_shape)
-                            tracklet_kf = KalmanBoxTracker(bbox_ltrb, orig=self.kf_orig)
-                        elif self.kf_mode == "BBSS":
-                            confidence = tracklet_conf_batch[t_idx, highest_non_nan_idx] if self.use_confidence else 1
-                            detection = Detection(id=0, bbox_ltwh=bbox_ltwh, confidence=confidence, feature=None, keypoints=None)
-                            tracklet_kf = Track(detection=detection, track_id=0, class_id=0, conf=confidence, n_init=0, max_age=10, ema_alpha=0.1, max_kalman_prediction_without_update=7, feature=None)
-                        else:
-                            raise ValueError(f"Invalid Kalman filter mode")
+                        confidence = tracklet_conf_batch[t_idx, highest_non_nan_idx] if self.use_confidence else 1
+                        detection = Detection(id=0, bbox_ltwh=bbox_ltwh, confidence=confidence)
+                        tracklet_kf = Track(detection=detection, track_id=0, class_id=0, conf=confidence, n_init=0, max_age=10, ema_alpha=0.1, max_kalman_prediction_without_update=7)
                         detections_per_age = {age: (bbox_ltwh, conf) for age, bbox_ltwh, conf in
                                               zip(tracklet_age_batch[t_idx, :highest_non_nan_idx], tracklet_bbox_ltwh[:highest_non_nan_idx], tracklet_conf_batch[t_idx, :highest_non_nan_idx]) if age > 0}
 
@@ -255,38 +247,16 @@ class KFTokenizer(Module):
                             oldest = int(max(tracklet_age_batch[t_idx, :highest_non_nan_idx]))
                             for age in range(oldest, 0, -1):
                                 tracklet_kf.predict()
-                                if self.kf_mode == "KalmanBoxTracker":
-                                    if age in detections_per_age:
-                                        bbox_ltwh, _ = detections_per_age[age]
-                                        bbox_ltrb = bbox_ltwh2ltrb(bbox_ltwh)
-                                        bbox_ltrb = unnormalize_bbox(bbox_ltrb, standard_img_shape)
-                                        tracklet_kf.update(bbox_ltrb)
-                                    else:
-                                        tracklet_kf.update(None)
-                                elif self.kf_mode == "BBSS":
-                                    if age in detections_per_age:
-                                        bbox_ltwh, conf = detections_per_age[age]
-                                        confidence = conf if self.use_confidence else 1
-                                        detection = Detection(id=0, bbox_ltwh=bbox_ltwh, confidence=confidence, feature=None,
-                                                              keypoints=None)
-                                        tracklet_kf.update(detection, 0, confidence)
-                                else:
-                                    raise ValueError(f"Invalid Kalman filter mode")
+                                if age in detections_per_age:
+                                    bbox_ltwh, conf = detections_per_age[age]
+                                    confidence = conf if self.use_confidence else 1
+                                    detection = Detection(id=0, bbox_ltwh=bbox_ltwh, confidence=confidence)
+                                    tracklet_kf.update(detection, 0, confidence)
 
-
-                        if self.kf_mode == "KalmanBoxTracker":
-                            predicted_bbox_ltrb = tracklet_kf.predict()[0]
-                            if np.any(np.isnan(predicted_bbox_ltrb)):
-                                predicted_bbox_ltrb = tracklet_kf.history_observations[-1]  # FIXME
-                            predicted_bbox_ltrb = normalize_bbox(predicted_bbox_ltrb, standard_img_shape)
-                            predicted_bbox_ltwh = ltrb_to_ltwh(predicted_bbox_ltrb)
-                        elif self.kf_mode == "BBSS":
-                            tracklet_kf.predict()
-                            predicted_bbox_ltwh = tracklet_kf.to_ltwh()
-                            if np.any(np.isnan(predicted_bbox_ltwh)):
-                                predicted_bbox_ltwh = tracklet_kf.last_detection.to_ltwh()
-                        else:
-                            raise ValueError(f"Invalid Kalman filter mode")
+                        tracklet_kf.predict()
+                        predicted_bbox_ltwh = tracklet_kf.to_ltwh()
+                        if np.any(np.isnan(predicted_bbox_ltwh)):
+                            predicted_bbox_ltwh = tracklet_kf.last_detection.to_ltwh()
                         predictions.append(predicted_bbox_ltwh)
                     else:
                         raise ValueError(f"No valid bbox found in tracklet {t_idx}")
@@ -308,4 +278,3 @@ class KFTokenizer(Module):
         tracks_pred_bbox_ltwh = tracks_pred_bbox_ltwh.to(torch.float32)
 
         return tracks_pred_bbox_ltwh
-"""
