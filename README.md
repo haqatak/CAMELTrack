@@ -1,16 +1,59 @@
-# CAMELTrack
+<div align="center">
 
-Welcome to the CAMELTrack codebase. CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), 
-a research framework for multi-object tracking.
+# CAMELTrack
+## Context-Aware Multi-cue ExpLoitation for Online Multi-ObjectTracking
+
+[![arXiv](https://img.shields.io/badge/arXiv-0000.00000-<COLOR>.svg)]() 
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/sam2mot-a-novel-paradigm-of-multi-object/multi-object-tracking-on-dancetrack)]()
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/ettrack-enhanced-temporal-motion-predictor/multi-object-tracking-on-sportsmot)]()
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/ucmctrack-multi-object-tracking-with-uniform/multi-object-tracking-on-mot17)]()
+<!---
+Add PoseTrack21 & BEE24
+--->
+
+</div>
+
+>**[CAMELTrack: Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking]()**
+>
+>Vladimir Somers, Baptiste Standaert, Victor Joos, Alexandre Alahi, Christophe De Vleeschouwer
+>
+>[*arxiv 0000.00000*]()
 
 <p align="center">
-  <img src="media/dancetrack.gif" width="300" />
-  <img src="media/sportsmot.gif" width="300" />
-  <img src="media/mot17.gif" width="300" /> 
-
+  <img src="media/dancetrack.gif" width="33%" style="margin: 8px; vertical-align: top;" alt="DanceTrack">
+  <img src="media/sportsmot.gif" width="33%" style="margin: 8px; vertical-align: top;" alt="SportsMOT">
+</p>
+<p align="center">
+  <img src="media/mot17.gif" width="33%" style="margin: 8px; vertical-align: top;" alt="MOT17">
+  <img src="media/bee24.gif" width="33%" style="margin: 8px; vertical-align: top;" alt="BEE24">
 </p>
 
+**CAMELTrack** is an **Online Multi-Object Tracker** that learns to associate detections without hand-crafted heuristics. 
+It combines multiple cues through a lightweight, fully trainable module and achieves state-of-the-art performance while 
+staying modular and fast.
+
+## Abstract
+**Online Multi-Object Tracking** has been recently dominated by **Tracking-by-Detection** (TbD) methods, where recent advances 
+rely on increasingly sophisticated heuristics for tracklet representation, feature fusion, and multi-stage matching. 
+The key strength of TbD lies in its modular design, enabling the integration of specialized off-the-shelf models like 
+motion predictors and re-identification. However, the extensive usage of human-crafted rules for temporal associations 
+makes these methods inherently limited in their ability to capture the complex interplay between various tracking cues. 
+In this work, we introduce **CAMEL**, a novel association module for Context-Aware Multi-Cue ExpLoitation, that learns 
+resilient association strategies directly from data, breaking free from hand-crafted heuristics while maintaining TbD's 
+valuable modularity.
+
+<p align="center">
+  <img src="media/pull_figure.jpg" width="50%" alt="Pull Figure of CAMEL">
+</p>
+
+At its core, CAMEL employs two transformer-based modules and relies on a novel association-centric 
+training scheme to effectively model the complex interactions between tracked targets and their various association cues. 
+Unlike end-to-end detection-by-tracking approaches, our method remains lightweight and fast to train while being able 
+to leverage external off-the-shelf models. Our proposed online tracking pipeline, CAMELTrack, achieves state-of-the-art 
+performance on multiple tracking benchmarks.
+
 ## Quick Installation Guide
+CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), a research framework for Multi-Object Tracking.
 
 ### Clone the repositories
 First git clone this repository, and the [TrackLab framework](https://github.com/TrackingLaboratory/tracklab) *in adjacent directories* : 
