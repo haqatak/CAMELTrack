@@ -132,7 +132,7 @@ class CAMELTrack(ImageLevelModule):
                         "track_id": trk.id,  # id is computed from a counter
                         "hits": trk.hits,
                         "age": trk.age,
-                        "matched_with": ("S", trk.last_detection.similarity_with_tracklet.cpu().numpy()) if trk.last_detection.similarity_with_tracklet is not None else None,
+                        "matched_with": ("S", trk.last_detection.similarity_with_tracklet.cpu().item()) if trk.last_detection.similarity_with_tracklet is not None else None,
                         "time_since_update": trk.time_wo_hits,
                         "state": trk.state,
                         "costs": {
