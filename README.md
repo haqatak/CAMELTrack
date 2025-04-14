@@ -1,6 +1,7 @@
 <div align="center">
 
-# 🐫 CAMELTrack 🐫<br>Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking
+# 🐫 CAMELTrack 🐫
+## Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking
 
 [![arXiv](https://img.shields.io/badge/arXiv-0000.00000-<COLOR>.svg)]() 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/sam2mot-a-novel-paradigm-of-multi-object/multi-object-tracking-on-dancetrack)]()
@@ -19,12 +20,12 @@ Add PoseTrack21 & BEE24
 >[*arxiv 0000.00000*]()
 
 <p align="center">
-  <img src="media/dancetrack.gif" width="33%" style="margin: 8px; vertical-align: top;" alt="DanceTrack">
-  <img src="media/sportsmot.gif" width="33%" style="margin: 8px; vertical-align: top;" alt="SportsMOT">
+  <img src="media/dancetrack.gif" width="33%" style="margin:1%;" alt="DanceTrack">
+  <img src="media/sportsmot.gif" width="33%" style="margin:1%;" alt="SportsMOT">
 </p>
 <p align="center">
-  <img src="media/mot17.gif" width="33%" style="margin: 8px; vertical-align: top;" alt="MOT17">
-  <img src="media/bee24.gif" width="33%" style="margin: 8px; vertical-align: top;" alt="BEE24">
+  <img src="media/mot17.gif" width="33%" style="margin:1%;" alt="MOT17">
+  <img src="media/bee24.gif" width="33%" style="margin:1%;" alt="BEE24">
 </p>
 
 **CAMELTrack** is an **Online Multi-Object Tracker** that learns to associate detections without hand-crafted heuristics. 
@@ -57,8 +58,8 @@ performance on multiple tracking benchmarks.
 - [x] Simplified installation and integration into TrackLab
 - [x] Public release of the repository
 - [ ] Release of the SOTA weights
-- [ ] Release of the pickles for training
-- [ ] Clean of the code for training
+- [ ] Release of the pickles for the training
+- [ ] Cleaning of the code for the training
 
 ## ⚙️ Quick Installation Guide
 CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), a research framework for Multi-Object Tracking.
