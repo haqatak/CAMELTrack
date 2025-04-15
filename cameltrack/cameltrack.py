@@ -1,19 +1,16 @@
 import logging
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-
 from hydra.utils import instantiate
-from pathlib import Path
-
 from omegaconf import DictConfig
+from tracklab.datastruct import TrackingDataset
+from tracklab.pipeline import ImageLevelModule
 
 from cameltrack.train.callbacks import SimMetrics
-
-from tracklab.pipeline import ImageLevelModule
-from tracklab.datastruct import TrackingDataset
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +83,7 @@ class CAMELTrack(ImageLevelModule):
         features = {
             feature_name: torch.tensor(np.stack(detections[feature_name]), dtype=torch.float32).unsqueeze(0)
             for feature_name in self.input_columns + ["im_width", "im_height"]
+            if len(detections[feature_name]) > 0
         }
 
         return [

@@ -5,7 +5,7 @@ checkpoint_path: null
 override_camel_cfg: null
 
 min_det_conf: 0.4
-min_init_det_conf: 0.9
+min_init_det_conf: 0.6
 min_num_hits: 0
 max_wo_hits: 150
 max_track_gallery_size: 50

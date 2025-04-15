@@ -4,68 +4,48 @@
 # to create the final config file. This item *must* be
 # the first element in the file.
 defaults:
-  - datasets:
-    - dancetrack
-    - sportsmot
-    - posetrack21
-    - mot17
-    - mot20
+  - dataset: dancetrack
   - eval: trackeval
   - engine: offline
-  - state: no_save
-  - visualization: save_videos
-  - modules/bbox_detector: yolox
-  - modules/pose_topdown: hrnet_posetrack18
+  - visualization: test_vis
+  #- modules/bbox_detector: yolov8
+  - modules/pose_estimator: yolov8-pose
   - modules/reid: kpr
-  - modules/track: camel_dancetrack
-  - modules/utils: occlusion_marker
+  - modules/track: camel
   - _self_
-
-# configure dataset here:
-dataset: ${datasets.dancetrack}  # FIXME difficult to erase configs under dataset.{...}
 
 # Pipeline definition :
 # - Defines the order in which the modules will be called
 # - If loading a tracking state from disk, remove modules whose outputs are already provided in the loaded state
 # Use 'pipeline: []' for an empty pipeline
 pipeline:
-#  - bbox_detector
-#  - pose_topdown
-#  - reid
+  #- bbox_detector
+  - pose_estimator
+  - reid
   - track
 
-# Experiment name
-experiment_name: "cameltrack"
+num_cores: 4
 
-# Path definitions
+# Logging
+experiment_name: "CAMELTrack"
+print_config: false
+use_wandb: false
+
+# Paths
 data_dir: "${project_dir}/data"
 model_dir: "${project_dir}/pretrained_models"
 
-# Machine configuration
-num_cores: 4
-use_wandb: False
-use_rich: True
-job_id: ${hydra:runtime.seed}  # to be replaced by slurm job id
+# State files loading/saving
+state:
+  load_file: null
+  save_file: "${project_dir}/states/${experiment_name}.pklz"
+  load_from_public_dets: false
+  load_from_groundtruth: false
 
-# Flags
-test_tracking: True
-print_config: False
-eval_tracking: True
-
-# Dataset configuration
-
-
-# Tracking configuration
-checkpoint_path: "???" # set this on the command line.
-
-modules:
-  track:
-    training_enabled: False
-    checkpoint_path: ${checkpoint_path}
-
-wandb:
-  notes: "" # add some notes about the experiment here to be displayed on wandb table
-  tags: []  # add tag to organize wandb experiments
+# Flag parameters
+test_tracking: true
+eval_tracking: true
+use_rich: true
 
 # configure Hydra to use the current working directory
 # and set up the output directory according to experiment_name
