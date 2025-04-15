@@ -87,6 +87,7 @@ class Accuracy(Metric):
 
 def log_roc(roc, auroc, pl_module, epoch, name):
     fpr, tpr, thresholds = roc.compute()
+    fpr, tpr, thresholds = fpr.cpu(), tpr.cpu(), thresholds.cpu()
     best_threshold = thresholds[torch.argmax(tpr - fpr)]
     b_auroc = auroc.compute()
     fig_, ax_ = roc.plot(score=True)
