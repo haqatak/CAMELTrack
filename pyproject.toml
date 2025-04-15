@@ -10,11 +10,12 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "tracklab[transformers,kpr]",
+    "tracklab[transformers]",
     "pytorch-metric-learning",
     "ordered-set",
     "overrides",
     "wandb",
+    "torchreid@git+https://github.com/victorjoos/keypoint_promptable_reidentification",
 ]
 
 [project.entry-points.tracklab_plugin]
