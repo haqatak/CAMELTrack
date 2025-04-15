@@ -3,6 +3,7 @@ _target_: cameltrack.CAMELTrack
 training_enabled: false
 checkpoint_path: null
 override_camel_cfg: null
+override_camel_cfg: {}
 
 min_det_conf: 0.4
 min_init_det_conf: 0.6
