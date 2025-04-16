@@ -114,7 +114,15 @@ from each model (if you don't want to run the off-the-shelf models) are availabl
 Alternatively, you can use the detections from [DiffMOT](https://github.com/Kroery/DiffMOT) directly, by placing them in the appropriate directories.
 
 ### CAMELTrack model weights
-The weights that have been used for the paper can be found here: XXX.
+The weights that have been used for the paper can be found here: XXX. They are downloaded
+automatically when running with the default config.
+
+| Dataset    | Appearance         | Keypoints          | weights |
+|------------|--------------------|--------------------|---------|
+| DanceTrack | :white_check_mark: | :white_check_mark: |         |
+| DanceTrack | :white_check_mark: |                    |         |
+| SportsMOT  | :white_check_mark: | :white_check_mark: |         |
+
 
 ## 🎯 Tracking
 
