@@ -65,47 +65,43 @@ performance on multiple tracking benchmarks.
 CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), a research framework for Multi-Object Tracking.
 
 ### Clone the repositories
-First git clone this repository, and the [TrackLab framework](https://github.com/TrackingLaboratory/tracklab) *in adjacent directories* : 
+First git clone this repository : 
 ```bash
-mkdir mot
-cd mot
-git clone XXX
-git clone https://github.com/TrackingLaboratory/tracklab.git
+git clone https://github.com/TrackingLaboratory/CAMELTrack.git
+```
+
+### Install using uv
+1. Install uv : https://docs.astral.sh/uv/getting-started/installation/
+2. Create a new virtual environment with a recent python version (>3.9) : 
+```bash
+cd cameltrack
+uv venv --python 3.12
 ```
 
 > [!NOTE]
-> If you are using an IDE (like PyCharm or VS Code), we suggest creating a single project with `soccernet` as root directory.
-> Instructions : [PyCharm](https://www.jetbrains.com/help/pycharm/configuring-project-structure.html) and [VS Code](https://code.visualstudio.com/docs/editor/multi-root-workspaces)
+> To use the virtual environment created by uv,
+> you need to prefix all commands with `uv run`, as shown in the examples below.
+> Using `uv run` will automatically download the dependencies the first time it is run. 
 
-#### Install using Poetry
-1. Install poetry : https://python-poetry.org/docs/#installing-with-the-official-installer
-2. Install the dependencies : 
+
+### First run
+
+In order to showcase CAMELTrack, we provide a default video, that will
+be visualized automatically when running for the first time:
 ```bash
-cd cameltrack
-poetry install
-poetry run mim install mmcv==2.0.1
-poetry shell
+uv run tracklab -cn cameltrack
 ```
-
-To enter the virtual environment created by Poetry, you can either use `poetry shell`,
-or prefix all commands by `poetry run`.
 
 ### Updating
 Please make sure to check the official GitHub regularly for updates.
-To update this repository to its latest version, run `git pull` on both repositories:
-```bash
-git pull
-git -C ../tracklab pull
-```
+To update this repository to its latest version, run `git pull` on the repository.
 
-After updating, you should rerun the installation of the dependencies in case they are updated 
-(either running `poetry install` or *both* `pip install`'s).
 
 ### Data preparation
 
 Download [MOT17](https://motchallenge.net/), [MOT20](https://motchallenge.net/), 
 [DanceTrack](https://drive.google.com/drive/folders/1ASZCFpPEfSOJRktR8qQ_ZoT9nZR0hOea), 
-[BEE24](https://holmescao.github.io/datasets/BEE24), [PoseTrack21](https://github.com/anDoer/PoseTrack21) and put them under cameltrack/data.
+[BEE24](https://holmescao.github.io/datasets/BEE24), [PoseTrack21](https://github.com/anDoer/PoseTrack21) and put them under data/ inside the cameltrack directory.
 
 ### Off-the-shelf Model weights
 The model weights for the detectors, reID models, and pose estimation models are available here : XXX. The input cues
