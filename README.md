@@ -123,8 +123,8 @@ automatically when running with the default config.
 | DanceTrack  | :white_check_mark: |                     |  66.1  | [camel_bbox_app_dancetrack]()      |
 | SportsMOT   | :white_check_mark: | :white_check_mark:  |  80.3  | [camel_bbox_app_kps_sportsmot]()   |
 | MOT17       | :white_check_mark: | :white_check_mark:  |  62.4  | [camel_bbox_app_kps_mot17]()       |
-| BEE24       |                    |                     |  50.3  | [camel_bbox_bee24]()               |
 | PoseTrack21 | :white_check_mark: | :white_check_mark:  |  66.0  | [camel_bbox_app_kps_posetrack24]() |
+| BEE24       |                    |                     |  50.3  | [camel_bbox_bee24]()               |
 
 
 ## 🎯 Tracking
