@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
+from huggingface_hub import hf_hub_download
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 from tracklab.datastruct import TrackingDataset
@@ -58,6 +59,13 @@ class CAMELTrack(ImageLevelModule):
 
         self.override_camel_cfg = override_camel_cfg
         if checkpoint_path:
+            checkpoint_path = Path(checkpoint_path)
+            if not checkpoint_path.is_file():
+                hf_hub_download(
+                    repo_id="trackinglaboratory/CAMELTrack",
+                    filename=checkpoint_path.name,
+                    local_dir=checkpoint_path.parent
+                )
             self.CAMEL = type(self.CAMEL).load_from_checkpoint(checkpoint_path, map_location=self.device, **override_camel_cfg)
             log.info(f"Loading CAMEL checkpoint from `{Path(checkpoint_path).resolve()}`.")
 
