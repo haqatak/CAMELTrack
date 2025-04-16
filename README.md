@@ -57,7 +57,7 @@ performance on multiple tracking benchmarks.
 - [x] Cleaning of the code
 - [x] Simplified installation and integration into TrackLab
 - [x] Public release of the repository
-- [ ] Release of the SOTA weights
+- [x] Release of the SOTA weights
 - [ ] Release of the pickles for the training
 - [ ] Cleaning of the code for the training
 
@@ -113,18 +113,17 @@ from each model (if you don't want to run the off-the-shelf models) are availabl
 
 Alternatively, you can use the detections from [DiffMOT](https://github.com/Kroery/DiffMOT) directly, by placing them in the appropriate directories.
 
-### CAMELTrack model weights
-The weights that have been used for the paper can be found here: XXX. They are downloaded
-automatically when running with the default config.
+### 🏋️‍♀ CAMELTrack Model Weights
+The pre-trained weights used to achieve state-of-the-art results in the paper are listed below. They are automatically downloaded when running CAMELTrack with the default configuration.
 
-| Dataset     |     Appearance     |      Keypoints      |  HOTA  | Weights                                 |
-|:------------|:------------------:|:-------------------:|:------:|:----------------------------------------|
-| DanceTrack  | :white_check_mark: | :white_check_mark:  |  69.3  | [camel_bbox_app_kps_dancetrack.ckpt]()  |
-| DanceTrack  | :white_check_mark: |                     |  66.1  | [camel_bbox_app_dancetrack.ckpt]()      |
-| SportsMOT   | :white_check_mark: | :white_check_mark:  |  80.3  | [camel_bbox_app_kps_sportsmot.ckpt]()   |
-| MOT17       | :white_check_mark: | :white_check_mark:  |  62.4  | [camel_bbox_app_kps_mot17.ckpt]()       |
-| PoseTrack21 | :white_check_mark: | :white_check_mark:  |  66.0  | [camel_bbox_app_kps_posetrack24.ckpt]() |
-| BEE24       |                    |                     |  50.3  | [camel_bbox_bee24.ckpt]()               |
+| Dataset     |     Appearance     |      Keypoints      |  HOTA  | Weights                                                                                                                                                                                                                                                                                                                              |
+|:------------|:------------------:|:-------------------:|:------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| DanceTrack  | :white_check_mark: | :white_check_mark:  |  69.3  | [camel_bbox_app_kps_dancetrack.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_app_kps_dancetrack.ckpt)                                                                                                                                                                                              |
+| DanceTrack  | :white_check_mark: |                     |  66.1  | [camel_bbox_app_dancetrack.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_app_dancetrack.ckpt)                                                                                                                                                                                                      |
+| SportsMOT   | :white_check_mark: | :white_check_mark:  |  80.3  | [camel_bbox_app_kps_sportsmot.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_app_kps_sportsmot.ckpt)                                                                                                                                                                                                |
+| MOT17       | :white_check_mark: | :white_check_mark:  |  62.4  | [camel_bbox_app_kps_mot17.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_app_kps_mot17.ckpt)                                                                                                                                                                                                    |
+| PoseTrack21 | :white_check_mark: | :white_check_mark:  |  66.0  | [camel_bbox_app_kps_posetrack24.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_app_kps_posetrack24.ckpt)                                                                                                                                                                                                                                                                                              |
+| BEE24       |                    |                     |  50.3  | [camel_bbox_bee24.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_bee24.ckpt)                                                                                                                                                                                                                                                                                                            |
 
 
 ## 🎯 Tracking
