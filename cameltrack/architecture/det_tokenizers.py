@@ -5,6 +5,9 @@ from cameltrack.architecture.base_module import Module
 
 
 class BBoxLinProj(Module):
+    input_columns = ["bbox_ltwh", "bbox_conf"]
+    training_columns = ["drop_bbox"]
+
     def __init__(self, hidden_dim, use_conf, dropout: float = 0.1):
         super().__init__()
         self.hidden_dim = hidden_dim
@@ -32,6 +35,9 @@ class BBoxLinProj(Module):
 
 
 class KeypointsLinProj(Module):
+    input_columns = ["keypoints_xyc"]
+    training_columns = ["drop_kps"]
+
     def __init__(self, hidden_dim, use_conf, dropout: float = 0.1):
         super().__init__()
         self.hidden_dim = hidden_dim
@@ -60,6 +66,9 @@ class KeypointsLinProj(Module):
 
 
 class PartsEmbeddingsLinProj(Module):
+    input_columns = ["embeddings", "visibility_scores"]
+    training_columns = ["drop_app"]
+
     def __init__(self, hidden_dim, use_parts, num_parts: int = 5, emb_size: int = 128, dropout: float = 0.1):
         super().__init__()
         self.hidden_dim = hidden_dim

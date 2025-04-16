@@ -49,6 +49,7 @@ class TemporalEncoder(Module):
         encoder_layers = nn.TransformerEncoderLayer(hidden_dim, n_heads, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(encoder_layers, n_layers)
         self.linear_out = nn.Linear(hidden_dim, output_dim, bias=True)
+        self.input_columns = self.det_tokenizer.input_columns
 
         # init weights and freeze
         if name is not None:

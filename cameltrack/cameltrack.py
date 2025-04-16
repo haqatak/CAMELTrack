@@ -24,7 +24,7 @@ def collate_fn(batch):  # FIXME collate_fn could handle a part of the preprocess
 
 class CAMELTrack(ImageLevelModule):
     collate_fn = collate_fn
-    input_columns = ["bbox_ltwh", "bbox_conf", "keypoints_xyc", "visibility_scores", "embeddings"]
+    input_columns = [] # MODIFIED AT RUNTIME !
     output_columns = ["track_id"]
 
     def __init__(
@@ -47,6 +47,10 @@ class CAMELTrack(ImageLevelModule):
         super().__init__(batch_size=1)
 
         self.CAMEL = instantiate(CAMEL, _recursive_=False).to(device)
+
+        for temporal_encoder in self.CAMEL.temp_encs.values():
+            self.input_columns += temporal_encoder.input_columns
+
         self.device = device
 
         self.min_det_conf = min_det_conf
