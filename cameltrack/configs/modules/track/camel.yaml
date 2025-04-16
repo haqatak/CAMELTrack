@@ -94,6 +94,10 @@ datamodule_cfg:
       transforms:
       - _target_: cameltrack.train.transforms.MaxNumObs
         max_num_obs: 150
+      - _target_: cameltrack.train.transforms.DropoutFeatures
+        p_drop_app: 0.4
+        p_drop_bbox: 0.1
+        p_drop_kps: 0.1
       - _target_: cameltrack.train.transforms.ProbabilisticTransform
         probs:
         - 0.4
