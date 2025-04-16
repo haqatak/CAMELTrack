@@ -48,9 +48,6 @@ class CAMELTrack(ImageLevelModule):
 
         self.CAMEL = instantiate(CAMEL, _recursive_=False).to(device)
 
-        for temporal_encoder in self.CAMEL.temp_encs.values():
-            self.input_columns += temporal_encoder.input_columns
-
         self.device = device
 
         self.min_det_conf = min_det_conf
@@ -68,6 +65,10 @@ class CAMELTrack(ImageLevelModule):
         self.train_cfg = train_cfg
         self.datamodule_cfg = datamodule_cfg
         self.tracking_dataset = tracking_dataset
+
+        # Generate input_columns specific to the model that was built
+        for temporal_encoder in self.CAMEL.temp_encs.values():
+            self.input_columns += temporal_encoder.input_columns
 
         self.reset()
 
