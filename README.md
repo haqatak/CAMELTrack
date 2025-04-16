@@ -117,14 +117,14 @@ Alternatively, you can use the detections from [DiffMOT](https://github.com/Kroe
 The weights that have been used for the paper can be found here: XXX. They are downloaded
 automatically when running with the default config.
 
-| Dataset     |     Appearance     |      Keypoints      |  HOTA  | Weights                            |
-|:------------|:------------------:|:-------------------:|:------:|:-----------------------------------|
-| DanceTrack  | :white_check_mark: | :white_check_mark:  |  69.3  | [camel_bbox_app_kps_dancetrack]()  |
-| DanceTrack  | :white_check_mark: |                     |  66.1  | [camel_bbox_app_dancetrack]()      |
-| SportsMOT   | :white_check_mark: | :white_check_mark:  |  80.3  | [camel_bbox_app_kps_sportsmot]()   |
-| MOT17       | :white_check_mark: | :white_check_mark:  |  62.4  | [camel_bbox_app_kps_mot17]()       |
-| PoseTrack21 | :white_check_mark: | :white_check_mark:  |  66.0  | [camel_bbox_app_kps_posetrack24]() |
-| BEE24       |                    |                     |  50.3  | [camel_bbox_bee24]()               |
+| Dataset     |     Appearance     |      Keypoints      |  HOTA  | Weights                                 |
+|:------------|:------------------:|:-------------------:|:------:|:----------------------------------------|
+| DanceTrack  | :white_check_mark: | :white_check_mark:  |  69.3  | [camel_bbox_app_kps_dancetrack.ckpt]()  |
+| DanceTrack  | :white_check_mark: |                     |  66.1  | [camel_bbox_app_dancetrack.ckpt]()      |
+| SportsMOT   | :white_check_mark: | :white_check_mark:  |  80.3  | [camel_bbox_app_kps_sportsmot.ckpt]()   |
+| MOT17       | :white_check_mark: | :white_check_mark:  |  62.4  | [camel_bbox_app_kps_mot17.ckpt]()       |
+| PoseTrack21 | :white_check_mark: | :white_check_mark:  |  66.0  | [camel_bbox_app_kps_posetrack24.ckpt]() |
+| BEE24       |                    |                     |  50.3  | [camel_bbox_bee24.ckpt]()               |
 
 
 ## 🎯 Tracking
