@@ -14,14 +14,14 @@ CAMEL:
   _target_: cameltrack.CAMEL
   sim_threshold: 0.1
   use_computed_sim_threshold: false
-  gaffe_cfg:
+  gaffe:
     _target_: cameltrack.architecture.GAFFE
     emb_dim: 1024
     n_heads: 8
     n_layers: 4
     dim_feedforward: 2048
     checkpoint_path: null
-  temp_encs_cfg:
+  temporal_encoders:
     app_encoder:
       _target_: cameltrack.architecture.TemporalEncoder
       hidden_dim: 512
@@ -53,7 +53,7 @@ CAMEL:
         _target_: cameltrack.architecture.BBoxLinProj
         use_conf: true
 
-  train_cfg:
+  optimizer:
     init_lr: 0.0001
     weight_decay: 0.0001
 

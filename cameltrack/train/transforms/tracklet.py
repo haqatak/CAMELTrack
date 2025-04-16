@@ -120,7 +120,7 @@ class DropoutSporadic(Transform):
             p_drop_age = np.full(len(df), self.p_drop)
         elif self.method == 'gaussian':
             # Compute the probability drop based on the 'age' column using gaussian decay
-            age = df['age'].to_numpy()
+            age = df['age'].to_numpy(dtype=float)
             p_drop_age = self.p_drop * np.exp(- age**2 / (2*self.sigma**2))
 
         # Create a random mask, where we keep only rows with lower dropout probability
@@ -182,7 +182,7 @@ class SwapSporadic(Transform):
         if self.method == 'uniform':
             p_swap_age = np.full(len(df), self.p_swap)
         elif self.method == 'gaussian':
-            age = df['age'].to_numpy()
+            age = df['age'].to_numpy(dtype=float)
             p_swap_age = self.p_swap * np.exp(- age**2 / (2*self.sigma**2))
 
         # Non-swapped indices and their corresponding swap probabilities

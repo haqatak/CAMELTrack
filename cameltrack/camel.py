@@ -71,11 +71,11 @@ class CAMEL(pl.LightningModule):
 
     def __init__(
             self,
-            gaffe_cfg: DictConfig,
-            temp_encs_cfg: DictConfig,
+            gaffe: DictConfig,
+            temporal_encoders: DictConfig,
             sim_threshold: int = 0.5,
             use_computed_sim_threshold: bool = False,
-            train_cfg: DictConfig = None,
+            optimizer: DictConfig = None,
             merge_token_strat: str = "sum",
             sim_strat: str = "norm_euclidean",
             ass_strat: str = "hungarian_algorithm",
@@ -84,8 +84,8 @@ class CAMEL(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=[key for key in locals() if "checkpoint_path" in key])
 
-        self.gaffe = instantiate(gaffe_cfg)
-        self.temp_encs = nn.ModuleDict({n: instantiate(t, output_dim=gaffe_cfg.emb_dim, name=n, _recursive_=False) for n, t in temp_encs_cfg.items()})
+        self.gaffe = instantiate(gaffe)
+        self.temp_encs = nn.ModuleDict({n: instantiate(t, output_dim=gaffe.emb_dim, name=n, _recursive_=False) for n, t in temporal_encoders.items()})
 
         self.sim_threshold = sim_threshold
         self.use_computed_sim_threshold = use_computed_sim_threshold
@@ -116,7 +116,7 @@ class CAMEL(pl.LightningModule):
         else:
             raise NotImplementedError
 
-        self.train_cfg = train_cfg
+        self.optimizer = optimizer
         self.sim_loss = losses.NTXentLoss(distance=distances.CosineSimilarity(), reducer=reducers.AvgNonZeroReducer())
 
 
@@ -288,7 +288,7 @@ class CAMEL(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.train_cfg.init_lr, weight_decay=self.train_cfg.weight_decay)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.optimizer.init_lr, weight_decay=self.optimizer.weight_decay)
         scheduler = transformers.get_cosine_schedule_with_warmup(
             optimizer,
             num_warmup_steps=self.trainer.estimated_stepping_batches // 20,

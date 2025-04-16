@@ -114,7 +114,10 @@ class CAMELDataset(Dataset):
             if name not in df.columns:
                 feature_columns.append((name, (1,)))
                 continue
-            shape = df.iloc[0][name].shape
+            if hasattr(df.iloc[0][name], "shape"):
+                shape = df.iloc[0][name].shape
+            else:
+                shape = ()
             shape = (1,) if shape == () else shape
             feature_columns.append((name, shape))
         self._feature_columns = feature_columns
