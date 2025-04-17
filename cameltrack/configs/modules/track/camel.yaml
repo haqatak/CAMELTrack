@@ -129,12 +129,11 @@ datamodule_cfg:
   dataset_splits:
   - train
   - val
-  name: cameltrack-kpr-dancetrack
-  path: ${dataset.dataset_path}/states/camel_training_fix_norm
+  name: camel
+  path: "${dataset.dataset_path}/states/train_camel"
   tracker_states:
-    train: ${dataset.dataset_path}/states/kpr/train-my_det-hrnetposetrack18-kpr-ocsort2.pklz
-    val: ${dataset.dataset_path}/states/kpr/val-my_det-hrnetposetrack18-kpr-ocsort2.pklz
-    test: ${dataset.dataset_path}/states/kpr/test-my_det-hrnetposetrack18-kpr-ocsort2.pklz
+    train: "${dataset.dataset_path}/states/my_train_state.pklz"
+    val: "${dataset.dataset_path}/states/my_val_state.pklz"
   dataset_transforms:
   - add_detections
   - add_last_obs_counter
