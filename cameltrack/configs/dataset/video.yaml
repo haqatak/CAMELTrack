@@ -1,0 +1,8 @@
+defaults:
+  - default
+
+_target_: tracklab.wrappers.ExternalVideo
+
+video_path: "${project_dir}/media/example_dancetrack0058.mp4"
+# video_path: "url:ytb"
+# video_path: "folder"
