@@ -99,6 +99,10 @@ cd cameltrack
 pip install -e .
 ```
 
+> [!NOTE]
+> The following instructions use the uv installation, but you can just remove `uv run`
+> from all commands.
+
 ### First run
 
 In order to showcase CAMELTrack, we provide a default video, that will
