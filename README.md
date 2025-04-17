@@ -152,7 +152,7 @@ Run the following command to track, for example, on DanceTrack, with the checkpo
 model weights :
 
 ```
-tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test modules.track=camel_dancetrack modules.track.checkpoint_path=/absolute/path/to/cameltrack_checkpoint.ckpt
+uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test modules.track=camel_dancetrack modules.track.checkpoint_path=camel_bbox_app_kps_dancetrack.ckpt
 ```
 
 By default this will create a new directory inside `outputs/cameltrack` which will contain a visualization of the
@@ -163,8 +163,15 @@ output for each sequence, in addition to the tracking output in MOT format.
 ### Training on a default dataset
 Run the following command to train on a specific dataset (for example, DanceTrack) : 
 ```
-tracklab -cn cameltrack_train dataset=dancetrack modules.track=camel_dancetrack
+uv run tracklab -cn cameltrack_train dataset=dancetrack modules.track=camel_dancetrack
 ```
+
+> [!WARNING]
+> There are some rough edges to training currently. You first have to run 
+> The off-the-shelf models manually to generate a tracker-state for each
+> (training/validation/test) set, before being able to train CAMEL.
+> We'll release the tracker-states we used soon.
+
 > [!NOTE]
 > You can always modify the configuration in [cameltrack.yaml](cameltrack/configs/cameltrack.yaml), and in the
 > other files inside this directory, instead of passing these values in the command line.
