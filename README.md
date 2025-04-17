@@ -124,8 +124,12 @@ Download [MOT17](https://motchallenge.net/), [MOT20](https://motchallenge.net/),
 [BEE24](https://holmescao.github.io/datasets/BEE24), [PoseTrack21](https://github.com/anDoer/PoseTrack21) and put them under data/ inside the cameltrack directory.
 
 ### Off-the-shelf Model weights
-The model weights for the detectors, reID models, and pose estimation models are available here : XXX. The input cues
-from each model (if you don't want to run the off-the-shelf models) are available here : XXX.
+The model weights for the detectors, reID models, and pose estimation models that have been used
+for the paper are available from DiffMOT : https://github.com/Kroery/DiffMOT/releases. 
+We will release the input cues from each model soon (if you don't want to run the off-the-shelf models).
+
+You can already use the ultralytics yolov8 or yolov11 detector or pose estimator, and
+the reID weights are downloaded automatically [from huggingface](https://huggingface.co/trackinglaboratory/keypoint_promptable_reid).
 
 Alternatively, you can use the detections from [DiffMOT](https://github.com/Kroery/DiffMOT) directly, by placing them in the appropriate directories.
 
