@@ -37,7 +37,7 @@ jobs:
         path: pretrained_models
         key: ${{ runner.os }}-models
     - name: Test with tracklab
-      run: uv run tracklab dataset.nframes=10
+      run: uv run tracklab -cn cameltrack dataset.nframes=10
     - name: Save models
       id: models-save
       uses: actions/cache/save@v4
