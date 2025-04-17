@@ -58,8 +58,8 @@ performance on multiple tracking benchmarks.
 - [x] Simplified installation and integration into TrackLab
 - [x] Public release of the repository
 - [x] Release of the SOTA weights
-- [ ] Release of the tracker_states used for the training
-- [ ] Release of the tracker_states and detections used for the evaluation
+- [ ] Release of the `tracker_states` used for the training
+- [ ] Release of the `tracker_states` and `detections` used for the evaluation
 - [ ] Cleaning of the code for the training
 
 ## ⚙️ Quick Installation Guide
@@ -76,7 +76,7 @@ git clone https://github.com/TrackingLaboratory/CAMELTrack.git
 You can then choose to install using either [uv](https://docs.astral.sh/uv/getting-started/installation/)
 or directly using pip (while managing your environment yourself).
 
-#### Install using uv (recommended)
+#### [Recommended] Install using uv
 1. Install uv : https://docs.astral.sh/uv/getting-started/installation/
 2. Create a new virtual environment with a recent python version (>3.9) : 
 ```bash
