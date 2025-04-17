@@ -64,13 +64,18 @@ performance on multiple tracking benchmarks.
 ## ⚙️ Quick Installation Guide
 CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), a research framework for Multi-Object Tracking.
 
-### Clone the repositories
+### Clone the repository & Install
+
 First git clone this repository : 
+
 ```bash
 git clone https://github.com/TrackingLaboratory/CAMELTrack.git
 ```
 
-### Install using uv
+You can then choose to install using either [uv](https://docs.astral.sh/uv/getting-started/installation/)
+or directly using pip (while managing your environment yourself).
+
+#### Install using uv (recommended)
 1. Install uv : https://docs.astral.sh/uv/getting-started/installation/
 2. Create a new virtual environment with a recent python version (>3.9) : 
 ```bash
@@ -83,6 +88,16 @@ uv venv --python 3.12
 > you need to prefix all commands with `uv run`, as shown in the examples below.
 > Using `uv run` will automatically download the dependencies the first time it is run. 
 
+#### Install using pip
+1. Move into the directory
+```bash
+cd cameltrack
+```
+2. Create a virtual environment (using, for example: conda)
+3. Install the dependencies inside the virtual environment :
+```bash
+pip install -e .
+```
 
 ### First run
 
