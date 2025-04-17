@@ -58,7 +58,8 @@ performance on multiple tracking benchmarks.
 - [x] Simplified installation and integration into TrackLab
 - [x] Public release of the repository
 - [x] Release of the SOTA weights
-- [ ] Release of the pickles for the training
+- [ ] Release of the tracker_states used for the training
+- [ ] Release of the tracker_states and detections used for the evaluation
 - [ ] Cleaning of the code for the training
 
 ## ⚙️ Quick Installation Guide
