@@ -65,6 +65,7 @@ performance on multiple tracking benchmarks.
 ## ⚙️ Quick Installation Guide
 CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), a research framework for Multi-Object Tracking.
 
+![Installation demo](media/cameltrack-demo3.gif)
 ### Clone the repository & Install
 
 First git clone this repository : 
