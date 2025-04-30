@@ -201,11 +201,11 @@ uv run tracklab -cn cameltrack_train dataset=dancetrack
 
 By default this will create a new directory inside `outputs/cameltrack_train`, which will contain the checkpoints
 to the created models, which can then be used for tracking and evaluation, by setting
-the `modules.track.checkpoint_path` configuration key in [camel.yaml](cameltrack/configs/modules/track/camel.yaml).
+the `modules.track.checkpoint_path` configuration key in [camel.yaml](cameltrack/configs/modules/track/camel.yaml#L4).
 
 ### Training on a custom dataset
 To train on a custom dataset, you'll have to integrate it in tracklab, either by using the MOT format, or by implementing
-a new dataset class. Once that's done, you can modify [cameltrack.yaml](cameltrack/configs/cameltrack.yaml#L4), to point to
+a new dataset class. Once that's done, you can modify [cameltrack.yaml](cameltrack/configs/cameltrack.yaml), to point to
 the new dataset.
 
 ## 🖋 Citation
