@@ -156,7 +156,7 @@ Run the following command to track, for example, on DanceTrack, with the checkpo
 model weights :
 
 ```
-uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test modules.track=camel_dancetrack modules.track.checkpoint_path=camel_bbox_app_kps_dancetrack.ckpt
+uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test modules.track.checkpoint_path=camel_bbox_app_kps_dancetrack.ckpt
 ```
 
 By default this will create a new directory inside `outputs/cameltrack` which will contain a visualization of the
