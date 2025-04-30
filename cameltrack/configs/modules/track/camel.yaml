@@ -132,8 +132,8 @@ datamodule_cfg:
   name: camel
   path: "${dataset.dataset_path}/states/train_camel"
   tracker_states:
-    train: "${dataset.dataset_path}/states/my_train_state.pklz"
-    val: "${dataset.dataset_path}/states/my_val_state.pklz"
+    train: "${dataset.dataset_path}/states/train.pklz"
+    val: "${dataset.dataset_path}/states/val.pklz"
   dataset_transforms:
   - add_detections
   - add_last_obs_counter

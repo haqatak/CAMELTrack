@@ -128,7 +128,9 @@ Download [MOT17](https://motchallenge.net/), [MOT20](https://motchallenge.net/),
 The model weights for the detectors, reID models, and pose estimation models that have been used
 for the paper are available from DiffMOT : https://github.com/Kroery/DiffMOT/releases. 
 
-The off-the-shelf model outputs for the different datasets are available in Pickle format [on huggingface](https://huggingface.co/trackinglaboratory/CAMELTrack/tree/main/states) (if you don't want to run the off-the-shelf models).
+The off-the-shelf model outputs for the different datasets ("Tracker States") are 
+available in Pickle format [on huggingface](https://huggingface.co/trackinglaboratory/CAMELTrack/tree/main/states)
+(if you don't want to run the off-the-shelf models).
 
 You can already use the ultralytics yolov8 or yolov11 detector or pose estimator, and
 the reID weights are downloaded automatically [from huggingface](https://huggingface.co/trackinglaboratory/keypoint_promptable_reid).
@@ -163,20 +165,39 @@ output for each sequence, in addition to the tracking output in MOT format.
 ## 💪 Training
 
 ### Training on a default dataset
-Run the following command to train on a specific dataset (for example, DanceTrack) : 
-```
-uv run tracklab -cn cameltrack_train dataset=dancetrack modules.track=camel_dancetrack
+
+You first have to run the complete tracking pipeline (without tracking, with a pre-trained
+CAMELTrack or with a SORT-based tracker, like oc-sort), on train, validation (and testing) sets
+for the dataset you want to train, and save the "Tracker States". 
+You can also use the Tracker States we provide for the
+common MOT datasets [on huggingface](https://huggingface.co/trackinglaboratory/CAMELTrack/tree/main/states).
+
+Once you have the Tracker States, you can put them in the dataset directory
+(in `data_dir`, by default `./data/$DATASET`) under the `states/` directory :
+```text
+data/
+    DanceTrack/
+        train/
+        val/
+        test/
+        states/
+            train.pklz
+            val.pklz
+            test.pklz
 ```
 
-> [!WARNING]
-> There are some rough edges to training currently. You first have to run 
-> The off-the-shelf models manually to generate a tracker-state for each
-> (training/validation/test) set, before being able to train CAMEL.
-> We'll release the tracker-states we used soon.
+Once you have the Tracker States, run the following command to train on a specific dataset
+(by default, DanceTrack) : 
+```
+uv run tracklab -cn cameltrack_train dataset=dancetrack
+```
+
 
 > [!NOTE]
 > You can always modify the configuration in [cameltrack.yaml](cameltrack/configs/cameltrack.yaml), and in the
 > other files inside this directory, instead of passing these values in the command line.
+> 
+> For example, to change the dataset for training, you can modify [camel.yaml](cameltrack/configs/modules/track/camel.yaml).
 
 By default this will create a new directory inside `outputs/cameltrack_train`, which will contain the checkpoints
 to the created models, which can then be used for tracking and evaluation.
