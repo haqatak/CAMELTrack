@@ -153,7 +153,7 @@ The pre-trained weights used to achieve state-of-the-art results in the paper ar
 ## 🎯 Tracking
 
 Run the following command to track, for example, on DanceTrack, with the checkpoint obtained from training, or the provided
-model weights :
+model weights (pretrained weights are downloaded automatically when using the name from the table above) :
 
 ```
 uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test modules.track.checkpoint_path=camel_bbox_app_kps_dancetrack.ckpt
@@ -168,12 +168,19 @@ output for each sequence, in addition to the tracking output in MOT format.
 
 You first have to run the complete tracking pipeline (without tracking, with a pre-trained
 CAMELTrack or with a SORT-based tracker, like oc-sort), on train, validation (and testing) sets
-for the dataset you want to train, and save the "Tracker States". 
+for the dataset you want to train, and save the "Tracker States":
+```bash
+uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=train
+uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=val
+uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test
+```
+By default they are saved in the `states/` directory.
+
 You can also use the Tracker States we provide for the
 common MOT datasets [on huggingface](https://huggingface.co/trackinglaboratory/CAMELTrack/tree/main/states).
 
 Once you have the Tracker States, you can put them in the dataset directory
-(in `data_dir`, by default `./data/$DATASET`) under the `states/` directory :
+(in `data_dir`, by default `./data/$DATASET`) under the `states/` directory, with the following names :
 ```text
 data/
     DanceTrack/
