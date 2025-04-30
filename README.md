@@ -205,7 +205,7 @@ the `modules.track.checkpoint_path` configuration key in [camel.yaml](cameltrack
 
 ### Training on a custom dataset
 To train on a custom dataset, you'll have to integrate it in tracklab, either by using the MOT format, or by implementing
-a new dataset class. Once that's done, you can modify [cameltrack.yaml](cameltrack/configs/cameltrack.yaml), to point to
+a new dataset class. Once that's done, you can modify [cameltrack.yaml](cameltrack/configs/cameltrack.yaml#L4), to point to
 the new dataset.
 
 ## 🖋 Citation
