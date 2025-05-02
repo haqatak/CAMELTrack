@@ -11,6 +11,13 @@
 Add PoseTrack21 & BEE24
 --->
 
+<p align="center">
+  <img src="media/dancetrack.gif" width="24%" style="margin:1%;" alt="DanceTrack">
+  <img src="media/sportsmot.gif" width="24%" style="margin:1%;" alt="SportsMOT">
+  <img src="media/mot17.gif" width="24%" style="margin:1%;" alt="MOT17">
+  <img src="media/bee24.gif" width="24%" style="margin:1%;" alt="BEE24">
+</p>
+
 </div>
 
 >**[CAMELTrack: Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking]()**
@@ -19,18 +26,11 @@ Add PoseTrack21 & BEE24
 >
 >[*arxiv 0000.00000*]()
 
-<p align="center">
-  <img src="media/dancetrack.gif" width="33%" style="margin:1%;" alt="DanceTrack">
-  <img src="media/sportsmot.gif" width="33%" style="margin:1%;" alt="SportsMOT">
-</p>
-<p align="center">
-  <img src="media/mot17.gif" width="33%" style="margin:1%;" alt="MOT17">
-  <img src="media/bee24.gif" width="33%" style="margin:1%;" alt="BEE24">
-</p>
-
 **CAMELTrack** is an **Online Multi-Object Tracker** that learns to associate detections without hand-crafted heuristics. 
 It combines multiple cues through a lightweight, fully trainable module and achieves state-of-the-art performance while 
 staying modular and fast.
+
+https://github.com/user-attachments/assets/706a6b5a-10f5-4464-97bd-266e737ffcc3
 
 ## 📄 Abstract
 **Online Multi-Object Tracking** has been recently dominated by **Tracking-by-Detection** (TbD) methods, where recent advances 
@@ -43,7 +43,7 @@ resilient association strategies directly from data, breaking free from hand-cra
 valuable modularity.
 
 <p align="center">
-  <img src="media/pull_figure.jpg" width="50%" alt="Pull Figure of CAMEL">
+  <img src="media/pull_figure.jpg" width="80%" alt="Pull Figure of CAMEL">
 </p>
 
 At its core, CAMEL employs two transformer-based modules and relies on a novel **Association-Centric 
