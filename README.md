@@ -215,6 +215,15 @@ To train on a custom dataset, you'll have to integrate it in tracklab, either by
 a new dataset class. Once that's done, you can modify [cameltrack.yaml](cameltrack/configs/cameltrack.yaml), to point to
 the new dataset.
 
+
+### Full CAMELTrack pipeline
+Here is an overview of the full online pipeline of CAMELTrack, following the tracking-by-detection paradigm.
+
+<p align="center">
+  <img src="media/architecture_cameltrack.jpg" width="100%" alt="Pull Figure of CAMEL">
+</p>
+
+
 ## 🖋 Citation
 
 If you use this repository for your research or wish to refer to our contributions, please use the following BibTeX entries:
