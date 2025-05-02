@@ -8,7 +8,7 @@ defaults:
   - eval: trackeval
   - engine: offline
   - visualization: keypoints
-  - modules/bbox_detector: yolo_ultralytics
+  #- modules/bbox_detector: yolo_ultralytics
   - modules/pose_estimator: yolo_ultralytics-pose
   - modules/reid: kpr
   - modules/track: camel
