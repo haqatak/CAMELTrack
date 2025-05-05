@@ -3,7 +3,7 @@
 # 🐫 CAMELTrack 🐫
 ## Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking
 
-[![arXiv](https://img.shields.io/badge/arXiv-2505.01257-<COLOR>.svg)]() 
+[![arXiv](https://img.shields.io/badge/arXiv-2505.01257-<COLOR>.svg)](https://arxiv.org/abs/2505.01257) 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/sam2mot-a-novel-paradigm-of-multi-object/multi-object-tracking-on-dancetrack)]()
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/ettrack-enhanced-temporal-motion-predictor/multi-object-tracking-on-sportsmot)]()
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/ucmctrack-multi-object-tracking-with-uniform/multi-object-tracking-on-mot17)]()
@@ -20,11 +20,11 @@ Add PoseTrack21 & BEE24
 
 </div>
 
->**[CAMELTrack: Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking]()**
+>**[CAMELTrack: Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking](https://arxiv.org/abs/2505.01257)**
 >
 >Vladimir Somers, Baptiste Standaert, Victor Joos, Alexandre Alahi, Christophe De Vleeschouwer
 >
->[*arxiv 0000.00000*]()
+>[*arxiv 2505.01257*](https://arxiv.org/abs/2505.01257)
 
 **CAMELTrack** is an **Online Multi-Object Tracker** that learns to associate detections without hand-crafted heuristics. 
 It combines multiple cues through a lightweight, fully trainable module and achieves state-of-the-art performance while 
