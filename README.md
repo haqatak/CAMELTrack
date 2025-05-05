@@ -3,7 +3,7 @@
 # 🐫 CAMELTrack 🐫
 ## Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking
 
-[![arXiv](https://img.shields.io/badge/arXiv-0000.00000-<COLOR>.svg)]() 
+[![arXiv](https://img.shields.io/badge/arXiv-2505.01257-<COLOR>.svg)]() 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/sam2mot-a-novel-paradigm-of-multi-object/multi-object-tracking-on-dancetrack)]()
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/ettrack-enhanced-temporal-motion-predictor/multi-object-tracking-on-sportsmot)]()
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/ucmctrack-multi-object-tracking-with-uniform/multi-object-tracking-on-mot17)]()
@@ -58,6 +58,7 @@ performance on multiple tracking benchmarks.
 - [x] Simplified installation and integration into TrackLab
 - [x] Public release of the repository
 - [x] Release of the SOTA weights
+- [x] Release of the paper on ArXiv
 - [ ] Release of the `tracker_states` used for the training
 - [ ] Release of the `tracker_states` and `detections` used for the evaluation
 - [ ] Cleaning of the code for the training
@@ -230,10 +231,14 @@ If you use this repository for your research or wish to refer to our contributio
 
 [CAMELTrack]():
 ```
-@inproceedings{,
-        title = ,
-        author = ,
-        booktitle = ,
+@misc{somers2025cameltrackcontextawaremulticueexploitation,
+      title={CAMELTrack: Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking}, 
+      author={Vladimir Somers and Baptiste Standaert and Victor Joos and Alexandre Alahi and Christophe De Vleeschouwer},
+      year={2025},
+      eprint={2505.01257},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2505.01257}, 
 }
 ```
 
