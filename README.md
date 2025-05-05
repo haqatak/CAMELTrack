@@ -59,7 +59,7 @@ performance on multiple tracking benchmarks.
 - [x] Public release of the repository
 - [x] Release of the SOTA weights
 - [x] Release of the paper on ArXiv
-- [ ] Release of the `tracker_states` used for the training
+- [x] Release of the `tracker_states` used for the training
 - [ ] Release of the `tracker_states` and `detections` used for the evaluation
 - [ ] Cleaning of the code for the training
 
