@@ -27,7 +27,7 @@ Add PoseTrack21 & BEE24
 >[*arxiv 2505.01257*](https://arxiv.org/abs/2505.01257)
 
 **CAMELTrack** is an **Online Multi-Object Tracker** that learns to associate detections without hand-crafted heuristics. 
-It combines multiple cues through a lightweight, fully trainable module and achieves state-of-the-art performance while 
+It combines multiple tracking cues through a lightweight, fully trainable module and achieves state-of-the-art performance while 
 staying modular and fast.
 
 https://github.com/user-attachments/assets/706a6b5a-10f5-4464-97bd-266e737ffcc3
