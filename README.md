@@ -4,9 +4,9 @@
 ## Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking
 
 [![arXiv](https://img.shields.io/badge/arXiv-2505.01257-<COLOR>.svg)](https://arxiv.org/abs/2505.01257) 
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/cameltrack-context-aware-multi-cue/multi-object-tracking-on-dancetrack)](https://paperswithcode.com/sota/multi-object-tracking-on-dancetrack?p=cameltrack-context-aware-multi-cue)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/cameltrack-context-aware-multi-cue/multi-object-tracking-on-sportsmot)](https://paperswithcode.com/sota/multi-object-tracking-on-sportsmot?p=cameltrack-context-aware-multi-cue)
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/cameltrack-context-aware-multi-cue/multi-object-tracking-on-mot17)](https://paperswithcode.com/sota/multi-object-tracking-on-mot17?p=cameltrack-context-aware-multi-cue)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/cameltrack-context-aware-multi-cue-1/multi-object-tracking-on-dancetrack)](https://paperswithcode.com/sota/multi-object-tracking-on-dancetrack?p=cameltrack-context-aware-multi-cue-1)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/cameltrack-context-aware-multi-cue-1/multi-object-tracking-on-sportsmot)](https://paperswithcode.com/sota/multi-object-tracking-on-sportsmot?p=cameltrack-context-aware-multi-cue-1)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/cameltrack-context-aware-multi-cue-1/multi-object-tracking-on-mot17)](https://paperswithcode.com/sota/multi-object-tracking-on-mot17?p=cameltrack-context-aware-multi-cue-1)
 <!---
 Add PoseTrack21 & BEE24
 --->
