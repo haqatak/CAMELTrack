@@ -218,7 +218,7 @@ the new dataset.
 
 
 ### Full CAMELTrack pipeline
-Here is an overview of the full online pipeline of CAMELTrack, following the tracking-by-detection paradigm.
+Here is an overview of the online pipeline of CAMELTrack, that follows the tracking-by-detection paradigm.
 
 <p align="center">
   <img src="media/architecture_cameltrack.jpg" width="100%" alt="Pull Figure of CAMEL">
