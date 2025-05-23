@@ -25,7 +25,7 @@ def collate_fn(batch):  # FIXME collate_fn could handle a part of the preprocess
 
 class CAMELTrack(ImageLevelModule):
     collate_fn = collate_fn
-    input_columns = [] # MODIFIED AT RUNTIME !
+    input_columns = ["bbox_conf"]  # MODIFIED AT RUNTIME !
     output_columns = ["track_id"]
 
     def __init__(
