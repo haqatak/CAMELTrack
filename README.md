@@ -229,7 +229,7 @@ Here is an overview of the online pipeline of CAMELTrack, that follows the track
 
 If you use this repository for your research or wish to refer to our contributions, please use the following BibTeX entries:
 
-[CAMELTrack]():
+[CAMELTrack](https://arxiv.org/abs/2505.01257):
 ```
 @misc{somers2025cameltrackcontextawaremulticueexploitation,
       title={CAMELTrack: Context-Aware Multi-cue ExpLoitation for Online Multi-Object Tracking}, 
