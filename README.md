@@ -60,6 +60,7 @@ performance on multiple tracking benchmarks.
 - [x] Release of the SOTA weights
 - [x] Release of the paper on ArXiv
 - [x] Release of the `tracker_states` used for the training
+- [x] Release weights of a model trained jointly on multiple datasets (DanceTrack, SportsMOT, MOT17, PoseTrack21)
 - [ ] Release of the `tracker_states` and `detections` used for the evaluation
 - [ ] Cleaning of the code for the training
 
@@ -150,6 +151,7 @@ The pre-trained weights used to achieve state-of-the-art results in the paper ar
 | PoseTrack21 | :white_check_mark: | :white_check_mark:  |  66.0  | [camel_bbox_app_kps_posetrack24.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_app_kps_posetrack24.ckpt)                                                                                                                                                                                                                                                                                              |
 | BEE24       |                    |                     |  50.3  | [camel_bbox_bee24.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_bee24.ckpt)                                                                                                                                                                                                                                                                                                            |
 
+We also provide (by default) the weights [camel_bbox_app_kps_global.ckpt](https://huggingface.co/trackinglaboratory/CAMELTrack/blob/main/camel_bbox_app_kps_global.ckpt) trained jointly on MOT17, DanceTrack, SportsMOT, and PoseTrack21, suitable for testing purposes.
 
 ## 🎯 Tracking
 

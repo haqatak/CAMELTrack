@@ -3,6 +3,7 @@ _target_: cameltrack.CAMELTrack
 training_enabled: false
 checkpoint_path: "${model_dir}/camel/camel_bbox_app_kps_dancetrack.ckpt"
 override_camel_cfg: {}
+checkpoint_path: "${model_dir}/camel/camel_bbox_app_kps_global.ckpt"
 
 min_det_conf: 0.4
 min_init_det_conf: 0.6
