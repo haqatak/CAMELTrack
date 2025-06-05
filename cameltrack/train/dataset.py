@@ -366,7 +366,7 @@ class CAMELDataModule(pl.LightningDataModule):
                 self.detections_paths[(dataset_name, ds_split)] = Path(ds_paths.path) / f"{ds_paths.name}_{ds_split}.pklz"
                 self.dataset_configs[(dataset_name, ds_split)] = Path(ds_paths.path) / f"{ds_paths.name}_{ds_split}_tracklets.json"
                 self.config_locks[(dataset_name, ds_split)] = FileLock(
-                    Path(ds_paths.path) / f"{self.name}_{ds_split}_tracklets.json.lock"
+                    Path(ds_paths.path) / f"{ds_paths.name}_{ds_split}_tracklets.json.lock"
                 )
                 self.tracker_states[(dataset_name, ds_split)] = ds_paths.tracker_states[ds_split]
 
