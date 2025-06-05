@@ -1,19 +1,26 @@
 _target_: cameltrack.CAMELTrack
 
 training_enabled: false
-checkpoint_path: "${model_dir}/camel/camel_bbox_app_kps_dancetrack.ckpt"
-override_camel_cfg: {}
 checkpoint_path: "${model_dir}/camel/camel_bbox_app_kps_global.ckpt"
+# Available checkpoints:
+# camel_bbox_app_global.ckpt | camel_bbox_app_kps_dancetrack.ckpt | camel_bbox_app_kps_sportsmot.ckpt
+# camel_bbox_app_kps_mot17.ckpt | camel_bbox_app_kps_posetrack21.ckpt | camel_bbox_bee24.ckpt
+# camel_bbox_app_dancetrack.ckpt
+override_camel_cfg:
+  # Override the default CAMEL configuration when loading the checkpoint
+  sim_threshold: 0.5  # DanceTrack/SportsMOT 0.1 | MOT17 0.475 | PoseTrack 0.45 | BEE24 0.6
 
-min_det_conf: 0.4
-min_init_det_conf: 0.6
-min_num_hits: 0
-max_wo_hits: 150
-max_track_gallery_size: 50
+# Tracklet Management Parameters
+min_det_conf: 0.4  # Minimum detection confidence to consider a detection
+min_init_det_conf: 0.6  # Minimum detection confidence to initialize a tracklet
+min_num_hits: 0  # Number of hits to consider a tracklet valid
+max_wo_hits: 150  # Maximum number of frames without hits to consider a tracklet invalid
+max_track_gallery_size: 50  # Gallery size for the Temporal Encoder
 
 CAMEL:
   _target_: cameltrack.CAMEL
-  sim_threshold: 0.1
+  # Model Configuration
+  sim_threshold: 0.1  # Similarity threshold for detection/tracklet matching (0.0 to 1.0)
   use_computed_sim_threshold: false
   gaffe:
     _target_: cameltrack.architecture.GAFFE
