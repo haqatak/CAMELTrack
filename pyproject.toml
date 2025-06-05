@@ -11,6 +11,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "tracklab",
+    "transformers",
     "pytorch-metric-learning",
     "ordered-set",
     "overrides",
