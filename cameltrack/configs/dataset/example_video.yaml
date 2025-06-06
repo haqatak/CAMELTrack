@@ -6,3 +6,4 @@ _target_: tracklab.wrappers.ExternalVideo
 video_path: "${project_dir}/media/example_dancetrack0058.mp4"
 # video_path: "https: Youtube video link"
 # video_path: "PATH/TO/FOLDER_WITH_IMAGES"
+# nframes: 1000  # Number of frames to process; set to -1 or leave unset to process all frames
