@@ -61,14 +61,14 @@ performance on multiple tracking benchmarks.
 - [x] Release of the paper on ArXiv
 - [x] Release of the `tracker_states` used for the training
 - [x] Release weights of a model trained jointly on multiple datasets (DanceTrack, SportsMOT, MOT17, PoseTrack21)
-- [ ] Release of the `tracker_states` and `detections` used for the evaluation
+- [x] Release of the `tracker_states` and `detections` used for the evaluation
 - [ ] Cleaning of the code for the training
 
 ## ⚙️ Quick Installation Guide
 CAMELTrack is built on top of [TrackLab](https://github.com/TrackingLaboratory/tracklab), a research framework for Multi-Object Tracking.
 
 ![Installation demo](media/cameltrack-demo3.gif)
-### Clone the repository & Install
+### Clone the Repository & Install
 
 First git clone this repository : 
 
@@ -97,7 +97,7 @@ uv venv --python 3.12
 ```bash
 cd cameltrack
 ```
-2. Create a virtual environment (using, for example: conda)
+2. Create a virtual environment (using by example: `conda`)
 3. Install the dependencies inside the virtual environment :
 ```bash
 pip install -e .
@@ -107,40 +107,41 @@ pip install -e .
 > The following instructions use the uv installation, but you can just remove `uv run`
 > from all commands.
 
-### First run
+### First Run
 
-In order to showcase CAMELTrack, we provide a default video, that will
-be visualized automatically when running for the first time:
+To demonstrate CAMELTrack, a default video will be automatically output during the first run:
 ```bash
 uv run tracklab -cn cameltrack
 ```
 
 ### Updating
 Please make sure to check the official GitHub regularly for updates.
-To update this repository to its latest version, run `git pull` on the repository.
+To update this repository to its latest version, run `git pull` on the repository or `uv run -U tracklab -cn cameltrack` to update the dependencies.
 
+### Data Preparation
 
-### Data preparation
+You can use tracklab directly on `mp4` videos or image folders.
+Or also download the desired datasets [MOT17](https://motchallenge.net/), [MOT20](https://motchallenge.net/), 
+[DanceTrack](https://drive.google.com/drive/folders/1ASZCFpPEfSOJRktR8qQ_ZoT9nZR0hOea), [SportsMOT](https://github.com/MCG-NJU/SportsMOT?tab=readme-ov-file#download),
+[BEE24](https://holmescao.github.io/datasets/BEE24), or [PoseTrack21](https://github.com/anDoer/PoseTrack21) and place them in the `data/` directory.
 
-Download [MOT17](https://motchallenge.net/), [MOT20](https://motchallenge.net/), 
-[DanceTrack](https://drive.google.com/drive/folders/1ASZCFpPEfSOJRktR8qQ_ZoT9nZR0hOea), 
-[BEE24](https://holmescao.github.io/datasets/BEE24), [PoseTrack21](https://github.com/anDoer/PoseTrack21) and put them under data/ inside the cameltrack directory.
+### Off-the-shelf Model Weights and Outputs
 
-### Off-the-shelf Model weights and outputs
-The model weights for the detectors, reID models, and pose estimation models that have been used
-for the paper are available from DiffMOT : https://github.com/Kroery/DiffMOT/releases. 
+#### Detections
+The YOLOX detector weights used in the paper are available from [DiffMOT](https://github.com/Kroery/DiffMOT/releases). 
+You can also directly use the detection text files from [DiffMOT](https://github.com/Kroery/DiffMOT) by placing them in the correct data directories.
 
-The off-the-shelf model outputs for the different datasets ("Tracker States") are 
-available in Pickle format [on huggingface](https://huggingface.co/trackinglaboratory/CAMELTrack/tree/main/states)
-(if you don't want to run the off-the-shelf models).
+#### Saved off-the-shelf model results
+We also provide precomputed outputs (`Tracker States`) for various datasets in `Pickle` format on [Hugging Face](https://huggingface.co/trackinglaboratory/CAMELTrack/tree/main/states), so you don’t need to run the models yourself.
 
-You can already use the ultralytics yolov8 or yolov11 detector or pose estimator, and
-the reID weights are downloaded automatically [from huggingface](https://huggingface.co/trackinglaboratory/keypoint_promptable_reid).
-
-Alternatively, you can use the detections from [DiffMOT](https://github.com/Kroery/DiffMOT) directly, by placing them in the appropriate directories.
+#### Off-the-shelf models
+TrackLab also offers several ready-to-use models (detectors, pose estimators, reid and other trackers). To see all available configurations and options, run:
+```bash
+uv run tracklab --help
+```
 
 ### 🏋️‍♀ CAMELTrack Model Weights
-The pre-trained weights used to achieve state-of-the-art results in the paper are listed below. They are automatically downloaded when running CAMELTrack with the default configuration.
+The pre-trained weights used to achieve state-of-the-art results in the paper are listed below. They are automatically downloaded when running CAMELTrack.
 
 | Dataset     |     Appearance     |      Keypoints      |  HOTA  | Weights                                                                                                                                                                                                                                                                                                                              |
 |:------------|:------------------:|:-------------------:|:------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -158,11 +159,11 @@ We also provide (by default) the weights [camel_bbox_app_kps_global.ckpt](https:
 Run the following command to track, for example, on DanceTrack, with the checkpoint obtained from training, or the provided
 model weights (pretrained weights are downloaded automatically when using the name from the table above) :
 
-```
+```bash
 uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test modules.track.checkpoint_path=camel_bbox_app_kps_dancetrack.ckpt
 ```
 
-By default this will create a new directory inside `outputs/cameltrack` which will contain a visualization of the
+By default, this will create a new directory inside `outputs/cameltrack` which will contain a visualization of the
 output for each sequence, in addition to the tracking output in MOT format.
 
 ## 💪 Training
@@ -177,7 +178,7 @@ uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=train
 uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=val
 uv run tracklab -cn cameltrack dataset=dancetrack dataset.eval_set=test
 ```
-By default they are saved in the `states/` directory.
+By default, they are saved in the `states/` directory.
 
 You can also use the Tracker States we provide for the
 common MOT datasets [on huggingface](https://huggingface.co/trackinglaboratory/CAMELTrack/tree/main/states).
@@ -198,7 +199,7 @@ data/
 
 Once you have the Tracker States, run the following command to train on a specific dataset
 (by default, DanceTrack) : 
-```
+```bash
 uv run tracklab -cn cameltrack_train dataset=dancetrack
 ```
 
@@ -209,7 +210,7 @@ uv run tracklab -cn cameltrack_train dataset=dancetrack
 > 
 > For example, to change the dataset for training, you can modify [camel.yaml](cameltrack/configs/modules/track/camel.yaml).
 
-By default this will create a new directory inside `outputs/cameltrack_train`, which will contain the checkpoints
+By default, this will create a new directory inside `outputs/cameltrack_train`, which will contain the checkpoints
 to the created models, which can then be used for tracking and evaluation, by setting
 the `modules.track.checkpoint_path` configuration key in [camel.yaml](cameltrack/configs/modules/track/camel.yaml#L4).
 
@@ -218,9 +219,8 @@ To train on a custom dataset, you'll have to integrate it in tracklab, either by
 a new dataset class. Once that's done, you can modify [cameltrack.yaml](cameltrack/configs/cameltrack.yaml), to point to
 the new dataset.
 
-
 ### Full CAMELTrack pipeline
-Here is an overview of the online pipeline of CAMELTrack, that follows the tracking-by-detection paradigm.
+This is an overview of CAMELTrack's online pipeline, which uses the tracking-by-detection approach.
 
 <p align="center">
   <img src="media/architecture_cameltrack.jpg" width="100%" alt="Pull Figure of CAMEL">
