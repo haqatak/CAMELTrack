@@ -31,7 +31,7 @@ class TemporalEncoder(Module):
         *args, **kwargs,
     ):
         super().__init__()
-        # transformer parameter related
+        # Transformer parameter related
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
         self.n_heads = n_heads
@@ -39,7 +39,7 @@ class TemporalEncoder(Module):
         self.dim_feedforward = dim_feedforward
         self.dropout = dropout
 
-        # parameters and layers
+        # Parameters and layers
         self.det_tokenizer = instantiate(det_tokenizer, hidden_dim=hidden_dim, _recursive_=False)
         self.pos_encoder = PositionalEncoding(hidden_dim)
         self.occluded_token = nn.Parameter(torch.zeros(hidden_dim))
@@ -51,7 +51,7 @@ class TemporalEncoder(Module):
         self.linear_out = nn.Linear(hidden_dim, output_dim, bias=True)
         self.input_columns = self.det_tokenizer.input_columns
 
-        # init weights and freeze
+        # Init weights and freeze if needed (for testing purposes)
         if name is not None:
             self.init_weights(checkpoint_path=checkpoint_path, module_name=f"temp_encs.{name}")
         else:
@@ -65,6 +65,11 @@ class TemporalEncoder(Module):
         self.freeze = freeze
 
     def forward(self, x):
+        """
+        Standard forward for a transformer encoder.
+        Outputs the cls token as the main embedding for each detection or tracklet.
+        B = batch size, N = number of detections/tracklets, S = sequence length (max age), E = token dimension, O = embedding dimension
+        """
         B, N, S, E, O = *x.feats_masks.shape, self.hidden_dim, self.output_dim
         output = torch.zeros(
             (B, N, O),
@@ -93,7 +98,15 @@ class TemporalEncoder(Module):
 
 
 class PositionalEncoding(nn.Module):
+    """
+    Standard positional encoding class used in transformers.
+    It adds temporal positional encodings to the input tensor based on the age of the detections/tracklets.
+    """
     def __init__(self, hidden_dim, max_len=1000):
+        """
+        :param hidden_dim: Dimension of the positional encoding.
+        :param max_len: The maximum sequence length (max age).
+        """
         super().__init__()
         self.hidden_dim = hidden_dim
         position = torch.arange(max_len).unsqueeze(1)

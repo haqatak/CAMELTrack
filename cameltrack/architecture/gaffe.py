@@ -25,7 +25,9 @@ class GAFFE(Module):
         self.dim_feedforward = dim_feedforward
         self.dropout = dropout
 
-        self.cls = nn.Parameter(torch.zeros(emb_dim), requires_grad=True)  # required when a batch is empty, because without the cls token the attention would be totally false on some rows, and the model would return nan@
+        # Required when a batch is empty, because without the cls token the attention would be totally false on some rows, and the model would return nan
+        self.cls = nn.Parameter(torch.zeros(emb_dim))
+
         self.src_norm = nn.LayerNorm(emb_dim)
         self.src_drop = nn.Dropout(dropout)
 
@@ -37,6 +39,11 @@ class GAFFE(Module):
         self.init_weights(checkpoint_path=checkpoint_path, module_name="gaffe")
 
     def forward(self, tracks, dets):
+        """
+        Standard forward pass for a transformer encoder.
+        Inputs are ordered by [detections, tracklets, cls_token]
+        Outputs are tracklet and detection objects updated with the processed embeddings
+        """
         src = torch.cat([dets.tokens, tracks.tokens, self.cls.repeat(dets.masks.shape[0], 1, 1)], dim=1)
         src = self.src_norm(src)
         src = self.src_drop(src)

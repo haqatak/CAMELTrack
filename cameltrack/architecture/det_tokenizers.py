@@ -9,6 +9,9 @@ class BBoxLinProj(Module):
     training_columns = ["drop_bbox"]
 
     def __init__(self, hidden_dim, use_conf, dropout: float = 0.1):
+        """
+        Linear projection of bounding box features to a hidden dimension.
+        """
         super().__init__()
         self.hidden_dim = hidden_dim
         self.use_conf = use_conf
@@ -39,6 +42,9 @@ class KeypointsLinProj(Module):
     training_columns = ["drop_kps"]
 
     def __init__(self, hidden_dim, use_conf, dropout: float = 0.1):
+        """
+        Linear projection of keypoints features to a hidden dimension.
+        """
         super().__init__()
         self.hidden_dim = hidden_dim
         self.use_conf = use_conf
@@ -70,6 +76,9 @@ class PartsEmbeddingsLinProj(Module):
     training_columns = ["drop_app"]
 
     def __init__(self, hidden_dim, use_parts, num_parts: int = 5, emb_size: int = 128, dropout: float = 0.1):
+        """
+        Linear projection of part-based features to a single hidden dimension.
+        """
         super().__init__()
         self.hidden_dim = hidden_dim
         self.use_parts = use_parts
