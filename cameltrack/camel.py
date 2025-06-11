@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class Tracklets:
-    """Contains all information of tracklets.
+    """Contains all information of tracklets like a sequence of detections.
 
     Args:
         features: dict of tensors float32 [B, N, T, F]
@@ -81,10 +81,28 @@ class CAMEL(pl.LightningModule):
             ass_strat: str = "hungarian_algorithm",
             norm_strat: str = "positive",
     ):
+        """
+        Initializes the CAMEL tracking model.
+
+        Args:
+            gaffe (DictConfig): Configuration for the GAFFE module (Group-Aware Feature Fusion Encoder).
+            temporal_encoders (DictConfig): Configurations for the TE (Temporal Encoders).
+            sim_threshold (float, optional): Similarity threshold for association.
+            use_computed_sim_threshold (bool, optional): Whether to use a computed similarity threshold.
+            optimizer (DictConfig, optional): Optimizer configuration for the training.
+            merge_token_strat (str, optional): Strategy for merging token representations - for testing purposes.
+            sim_strat (str, optional): Similarity metric strategy - for testing purposes.
+            ass_strat (str, optional): Association strategy for matching - for testing purposes.
+            norm_strat (str, optional): Normalization strategy for coordinates - for testing purposes.
+
+        Raises:
+            NotImplementedError: If a provided strategy is not implemented.
+        """
         super().__init__()
         self.save_hyperparameters(ignore=[key for key in locals() if "checkpoint_path" in key])
 
         self.gaffe = instantiate(gaffe)
+        # Initializes a Temporal Encoder for each input cue (bbox/keypoints/appearance/...)
         self.temp_encs = nn.ModuleDict({n: instantiate(t, output_dim=gaffe.emb_dim, name=n, _recursive_=False) for n, t in temporal_encoders.items()})
 
         self.sim_threshold = sim_threshold
@@ -117,10 +135,19 @@ class CAMEL(pl.LightningModule):
             raise NotImplementedError
 
         self.optimizer = optimizer
+        # InfoNCE loss
         self.sim_loss = losses.NTXentLoss(distance=distances.CosineSimilarity(), reducer=reducers.AvgNonZeroReducer())
 
 
     def training_step(self, batch, batch_idx):
+        """
+        Single training step in the PyTorch Lightning training loop.
+        Returns a dict containing :
+            - "loss" (torch.Tensor): The computed loss for the current batch.
+            - "dets" (Detections): Processed detections data.
+            - "tracks" (Tracklets): Processed tracklets data.
+            - "td_sim_matrix" (torch.Tensor): The similarity matrix between tracklets and detections.
+        """
         tracks, dets = self.train_val_preprocess(batch)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
         loss = self.compute_loss(tracks, dets, td_sim_matrix)
@@ -133,6 +160,14 @@ class CAMEL(pl.LightningModule):
         }
 
     def validation_step(self, batch, batch_idx):
+        """
+        Single validation step in the PyTorch Lightning training loop.
+        Returns a dict containing :
+            - "loss" (torch.Tensor): The computed loss for the current batch.
+            - "dets" (Detections): Processed detections data.
+            - "tracks" (Tracklets): Processed tracklets data.
+            - "td_sim_matrix" (torch.Tensor): The similarity matrix between tracklets and detections.
+        """
         tracks, dets = self.train_val_preprocess(batch)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
         loss = self.compute_loss(tracks, dets, td_sim_matrix)
@@ -145,6 +180,16 @@ class CAMEL(pl.LightningModule):
         }
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        """
+        Single evaluation step in the PyTorch Lightning training loop.
+        Returns a tuple :
+            - association_matrix (torch.Tensor): The binary boolean association matrix between tracklets and detections.
+            - association_result (list[dict]): Contains the association results, where each dict has:
+                - matched_td_indices (list[int]): Indices of matched detections for each tracklet.
+                - unmatched_detections (list[int]): Indices of unmatched detections.
+                - unmatched_trackers (list[int]): Indices of unmatched tracklets.
+            - td_sim_matrix (torch.Tensor): The similarity matrix scores between tracklets and detections.
+        """
         tracks, dets = self.predict_preprocess(batch)
         tracks, dets, td_sim_matrix = self.forward(tracks, dets)
         sim_threshold = self.computed_sim_threshold if (self.use_computed_sim_threshold and self.computed_sim_threshold) else self.sim_threshold
@@ -152,6 +197,21 @@ class CAMEL(pl.LightningModule):
         return association_matrix, association_result, td_sim_matrix
 
     def forward(self, tracks, dets):
+        """
+        Performs a forward pass through the CAMEL model.
+
+        Returns:
+            tuple: A tuple containing:
+                - tracks (Tracklets): Updated tracklets with tokenized and embedded features.
+                - dets (Detections): Updated detections with tokenized and embedded features.
+                - td_sim_matrix (torch.Tensor): The similarity matrix between tracklets and detections.
+
+        Steps:
+            1. Tokenize the input features of tracklets and detections using the linear projections.
+            2. Merge the tokenized features into unified token representations using the Temporal Encoders.
+            3. Apply the GAFFE module to compute embeddings from the tokens.
+            4. Compute the similarity matrix between the tracklet and detection embeddings.
+        """
         tracks, dets = self.tokenize(tracks, dets)  # feats -> list(tokens)
         tracks, dets = self.merge(tracks, dets)  # list(tokens) -> tokens
         tracks, dets = self.gaffe(tracks, dets)  # tokens -> embs
@@ -191,7 +251,7 @@ class CAMEL(pl.LightningModule):
 
     def tokenize(self, tracks, dets):
         """
-        Operate the tokenization step for the differents temp_encs
+        Operate the tokenization step for the different Temporal Encoders.
         :param dets: Detections
         :param tracks: Tracklets
         :return: updated dets and tracks with partial tokens in a dict not merged
@@ -205,14 +265,14 @@ class CAMEL(pl.LightningModule):
 
     def similarity(self, tracks, dets):
         """
-        Compute the similarity matrix between the tokens of dets and tracks.
-        if tokens is a list of N tensors and not a single tensor, N similarity matrices are computed and averaged
+        Compute the similarity matrix between the detection and tracklet tokens.
+        (If tokens is a list of N tensors and not a single tensor, N similarity matrices are computed and averaged.)
         """
         # FIXME similarity_metric should be a list, a different metric could be used for each type of token
         if isinstance(tracks.embs, dict):
             td_sim_matrix = []
             for (tokenizer_name, t), (_, d) in zip(tracks.embs.items(), dets.embs.items()):
-                # each token type has its own default distance (reid = cosine, bbox = iou, etc).
+                # Each token type has its own default distance (reid = cosine, bbox = iou, etc).
                 # Use that default distance for a heuristic that would, for instance, combine IoU with cosine distance.
                 if self.sim_strat == "default_for_each_token_type":
                     sm = similarity_metrics[self.temp_encs[tokenizer_name].default_similarity_metric]
@@ -262,7 +322,7 @@ class CAMEL(pl.LightningModule):
                 if ((len(masked_det_embs) != 0 or len(masked_track_embs) != 0) or (len(masked_det_embs) > 1 or len(masked_track_embs) > 1)):
                     mask_sim_loss[h, i] = True
 
-                    # Compute embeddings loss on all tracks/detections (track_ids >= 0)
+                    # Compute embeddings' loss on all tracks/detections (track_ids >= 0)
                     valid_tracks = masked_track_targets >= 0
                     valid_dets = masked_det_targets >= 0
                     embeddings = torch.cat([masked_track_embs[valid_tracks],
@@ -279,6 +339,7 @@ class CAMEL(pl.LightningModule):
         return sim_loss
 
     def log_loss(self, loss, step):
+        # pytorch-lightning way to log
         self.log_dict(
             {f"{step}/loss": loss},
             on_epoch=True,
@@ -288,6 +349,7 @@ class CAMEL(pl.LightningModule):
         )
 
     def configure_optimizers(self):
+        # pytorch-lightning way to init the optimizer and scheduler
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.optimizer.init_lr, weight_decay=self.optimizer.weight_decay)
         scheduler = transformers.get_cosine_schedule_with_warmup(
             optimizer,
