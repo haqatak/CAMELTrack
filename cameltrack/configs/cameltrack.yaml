@@ -1,8 +1,9 @@
 # Main CAMELTrack config
 
-# The defaults list contains the files that will be used
+# The defaults' list contains the files that will be used
 # to create the final config file. This item *must* be
 # the first element in the file.
+# 'tracklab --help' shows the available modules/datasets/visualizations/engines/...
 defaults:
   - dataset: example_video
   - eval: trackeval
@@ -14,7 +15,7 @@ defaults:
   - modules/track: camel
   - _self_
 
-# Pipeline definition :
+# Pipeline definition:
 # - Defines the order in which the modules will be called
 # - If loading a tracking state from disk, remove modules whose outputs are already provided in the loaded state
 # Use 'pipeline: []' for an empty pipeline
@@ -24,7 +25,7 @@ pipeline:
   - reid
   - track
 
-num_cores: 4
+num_cores: 4  # Number of CPU cores to use for data loading and processing
 
 # Logging
 experiment_name: "CAMELTrack"
@@ -39,16 +40,15 @@ model_dir: "${project_dir}/pretrained_models"
 state:
   load_file: null
   save_file: "${project_dir}/states/${experiment_name}-${dataset.eval_set}.pklz"
-  load_from_public_dets: false
-  load_from_groundtruth: false
+  load_from_public_dets: false  # Use public detections in the pipeline
+  load_from_groundtruth: false  # Use ground truth detections in the pipeline
 
 # Flag parameters
 test_tracking: true
 eval_tracking: true
-use_rich: true
+use_rich: true  # Use colorful terminal output
 
-# configure Hydra to use the current working directory
-# and set up the output directory according to experiment_name
+# Configure Hydra to use the current working directory and set up the output directory according to experiment_name
 project_dir: "${hydra:runtime.cwd}"
 hydra:
   job:
