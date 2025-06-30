@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import multiprocessing
+import os
 import pickle
 import shutil
 import zipfile
@@ -506,6 +507,7 @@ class CAMELDataModule(pl.LightningDataModule):
         detections = detections[ds_split]
         metadatas = metadatas[ds_split]
         detections_path = self.detections_paths[ds_split]
+        os.makedirs(os.path.dirname(detections_path), exist_ok=True)
         save_zf = zipfile.ZipFile(
             detections_path,
             mode="x",
