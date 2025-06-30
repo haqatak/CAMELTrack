@@ -1,0 +1,26 @@
+defaults:
+  - cameltrack
+  - override dataset: dancetrack
+  - _self_
+
+pipeline:
+  - track
+
+use_wandb: true
+
+# Example for DanceTrack, but can be adapted for other datasets.
+# States files can be downloaded from the CAMELTrack repository on huggingface.
+state:
+  load_file: "${dataset.dataset_path}/states/dancetrack-${dataset.eval_set}.pklz"
+  save_file: null
+
+modules:
+  track:
+    training_enabled: true
+    # Generate the training dataset setup: compile tracklets in a pickle file for each split
+    datamodule_cfg:
+      name: "camel"  # Name for the pickle files containing the training tracklets (will be appended with the split name)
+      path: "${dataset.dataset_path}/states/camel_training"  # Where to store those training states
+      tracker_states:
+        train: "${dataset.dataset_path}/states/dancetrack-train.pklz"  # Update this path to your states
+        val: "${dataset.dataset_path}/states/dancetrack-val.pklz"  # Update this path to your states
