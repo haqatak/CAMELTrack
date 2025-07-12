@@ -227,6 +227,73 @@ This is an overview of CAMELTrack's online pipeline, which uses the tracking-by-
 </p>
 
 
+## 🔍 Ideas for Further Work
+
+Our motivation was to glue together strong expert pre-trained models (detection, reid, motion, pose, etc.) using a learned module instead of SORT-like heuristics (e.g. ByteTrack, DeepSORT, BoT-SORT, ...).  
+This modular design contrasts with end-to-end (E2E) methods (MOTR, MOTIP, etc), which aim to learn everything jointly—including detection, re-identification, and motion—but often require large-scale training data, are computationally intensive, and struggle in real-world applications.  
+
+While CAMELTrack provides a strong foundation, there is room for improvement.  
+The authors will not pursue these directions further, so we encourage others to explore and build on this work.
+Feel free to open an issue or contact the authors for any suggestion or question regarding these ideas.
+
+### Suggested Research Directions
+
+<details>
+<summary>1. Self-Supervised Video Pre-Training</summary>
+
+Self-supervised pre-training on large-scale video datasets is a promising path to improve temporal reasoning and generalization in MOT, particularly for end-to-end (E2E) methods that struggle without massive annotated data. Tasks like future frame prediction could naturally teach models about object motion and identity preservation—central to tracking—without requiring manual supervision.
+
+</details>
+
+<details>
+<summary>2. Better Training Strategies</summary>
+
+Our ablation studies show that data augmentation is crucial to reach state-of-the-art performance, but we only implemented basic strategies. There is clear room for improvement here.
+
+</details>
+
+<details>
+<summary>3. Cross-Domain Tracking</summary>
+
+Study how CAMELTrack behaves in cross-domain settings by training it on one domain (e.g. DanceTrack) and evaluating it on another (e.g. SportMOT), while keeping the CAMEL association module fixed. The idea is to replace only the off-the-shelf components (detector, ReID, etc.) with counterparts trained on the target domain. We believe that, unlike end-to-end methods—which learn all components jointly—CAMEL’s modular design may allow for easier adaptation to new domains, without retraining the learned association module.
+
+</details>
+
+<details>
+<summary>4. Additional Cues</summary>
+
+Extend CAMELTrack with domain-specific or general cues. Examples include jersey numbers for sports, license plates for vehicles, segmentation masks, monocular depth, or learned motion models. The architecture can naturally handle additional input modalities.
+
+</details>
+
+<details>
+<summary>5. Alternative Designs</summary>
+
+CAMELTrack aims to be simple and free of complex or handcrafted architectural design. Future work could however explore different architectures or custom training objectives.
+
+</details>
+
+<details>
+<summary>6. Bridge the Gap with Detection-by-Tracking Methods</summary>
+
+End-to-end methods like MOTR or SAM2 follow the detection-by-tracking paradigm, meaning they can use past information from their memory to help re-detect occluded targets in the current frame. CAMELTrack, like other tracking-by-detection methods, cannot currently do this as detection is performed independently at each frame. A possible extension would be to replace CAMEL’s YOLO module with a dedicated DETR-like detector, prompted with CAMEL’s track tokens from the previous frame to help re-detect previously tracked targets.
+
+</details>
+
+<details>
+<summary>7. Latent Space Tracking with Detection Tokens</summary>
+
+CAMELTrack currently relies on bounding box coordinates and image crops from YOLO. A promising direction would be to operate directly in the latent space of modern detectors like DETR, using their detection tokens as inputs to the association module. These tokens carry rich contextual information—including appearance, object relationships, and scene context—that are lost when reduced to spatial boxes alone. Leveraging this richer representation could help resolve ambiguities, such as overlapping targets, more effectively. This approach could complement rather than replace dedicated ReID models, which still provide stronger appearance cues due to their high resolution input image crop and their training on difficult ReID-specific datasets with hard triplets of samples.
+
+</details>
+
+<details>
+<summary>8. Learned Tracklet Management</summary>
+
+CAMELTrack currently focuses on frame-to-frame association but lacks an explicit mechanism for managing tracklet lifecycles. Future work could extend CAMEL to handle higher-level decisions such as when to pause a tracklet, when to resume it, or when to initialize a new one. Incorporating learned or rule-based tracklet management could improve robustness in scenarios involving occlusions, missed detections, false positives, or re-entries.
+
+</details>
+
 ## 🖋 Citation
 
 If you use this repository for your research or wish to refer to our contributions, please use the following BibTeX entries:
