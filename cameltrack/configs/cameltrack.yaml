@@ -25,7 +25,7 @@ pipeline:
   - reid
   - track
 
-num_cores: 4  # Number of CPU cores to use for data loading and processing
+num_cores: 1  # Number of CPU cores to use for data loading and processing
 
 # Logging
 experiment_name: "CAMELTrack"

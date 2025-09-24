@@ -70,7 +70,7 @@ class CAMELTrack(ImageLevelModule):
         super().__init__(batch_size=1)
 
         # Instantiate the CAMEL model and move it to the specified device
-        self.CAMEL = instantiate(CAMEL, _recursive_=False)
+        self.CAMEL = instantiate(CAMEL, _recursive_=False).to(device)
         self.device = device
 
         # Tracking parameters
@@ -92,7 +92,7 @@ class CAMELTrack(ImageLevelModule):
                     local_dir=checkpoint_path.parent
                 )
             # Load the CAMEL model from the checkpoint
-            self.CAMEL = type(self.CAMEL).load_from_checkpoint(checkpoint_path, map_location="cpu", **override_camel_cfg)
+            self.CAMEL = type(self.CAMEL).load_from_checkpoint(checkpoint_path, map_location=self.device, **override_camel_cfg)
             log.info(f"Loading CAMEL checkpoint from `{Path(checkpoint_path).resolve()}`.")
 
         # Training and dataset configurations
@@ -112,7 +112,7 @@ class CAMELTrack(ImageLevelModule):
         """
         Reset the tracker state to start tracking in a new video.
         """
-        self.CAMEL.eval()
+        self.CAMEL.to(self.device).eval()
         self.tracklets = []
         self.frame_count = 0
 
@@ -232,9 +232,7 @@ class CAMELTrack(ImageLevelModule):
         # Build a batch for the CAMEL model using the tracklets and detections
         batch = self.build_camel_batch(tracklets, detections)
         # Perform prediction using the CAMEL model
-        self.CAMEL.to(self.device)
         association_matrix, association_result, td_sim_matrix = self.CAMEL.predict_step(batch, self.frame_count)
-        self.CAMEL.to("cpu")
         # Extract matched indices, unmatched tracklets, and unmatched detections
         matched = association_result[0]["matched_td_indices"]
         unmatched_trks = association_result[0]["unmatched_trackers"]
