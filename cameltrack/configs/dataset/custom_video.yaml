@@ -1,0 +1,5 @@
+defaults:
+  - video
+
+# By leaving video_file null, we can override it from the command line
+video_file: null
