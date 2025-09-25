@@ -51,7 +51,7 @@ def main():
     command = [
         "uv", "run", "tracklab",
         "-cn", "cameltrack",
-        "dataset=external_video",
+        "dataset=video",
         f"dataset.video_file={str(video_path.resolve())}",
         f"modules.track.checkpoint_path={model_path}",
         f"state.save_file={str(output_path.resolve())}",
