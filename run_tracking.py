@@ -55,7 +55,7 @@ def main():
         f"dataset.video_path={str(video_path.resolve())}",
         f"modules.track.checkpoint_path={model_path}",
         f"state.save_file={str(output_path.resolve())}",
-        "visualization=null",  # Disable default visualization
+        "~visualization",  # Disable default visualization
     ]
 
     try:
