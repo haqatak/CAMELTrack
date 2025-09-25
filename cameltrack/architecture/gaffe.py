@@ -56,7 +56,11 @@ class GAFFE(Module):
             ],
             dim=1,
         )
-        x = self.encoder(src, src_key_padding_mask=~src_mask)
+        if src.device.type == "mps":
+            x = self.encoder.to("cpu")(src.to("cpu"), src_key_padding_mask=~src_mask.to("cpu"))
+            x = x.to(src.device)
+        else:
+            x = self.encoder(src, src_key_padding_mask=~src_mask)
 
         tracks.embs = x[:, dets.masks.shape[1]: dets.masks.shape[1] + tracks.masks.shape[1]]  # [B, T(+P), E]
         dets.embs = x[:, :dets.masks.shape[1]]  # [B, D(+P), E]
